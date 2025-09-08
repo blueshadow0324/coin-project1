@@ -26,27 +26,3 @@
 <p>Inga objekt tillgängliga just nu.</p>
 {% endfor %}
 {% endblock %}
-➕ templates/add_item.html
-{% extends "base.html" %}
-{% block content %}
-<h2>Lägg till objekt i marknaden</h2>
-<form method="post" enctype="multipart/form-data">
-    <div class="mb-3">
-        <label>Titel:</label>
-        <input type="text" name="title" class="form-control" required>
-    </div>
-    <div class="mb-3">
-        <label>Beskrivning:</label>
-        <textarea name="description" class="form-control"></textarea>
-    </div>
-    <div class="mb-3">
-        <label>Pris (coins):</label>
-        <input type="number" name="price" class="form-control" required min="1">
-    </div>
-    <div class="mb-3">
-        <label>Bild (valfritt):</label>
-        <input type="file" name="image" accept="image/*" class="form-control">
-    </div>
-    <button type="submit" class="btn btn-primary">Lägg till</button>
-</form>
-{% endblock %}
