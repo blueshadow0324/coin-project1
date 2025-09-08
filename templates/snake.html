@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Snake - Spela och tjäna poäng</h1>
+
+<p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
+
+<canvas id="gameCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+
+<p>Poäng: <span id="score">0</span></p>
+<p>Senaste spel: <span id="recentScore">-</span></p>
+<p>Högsta poäng (all-time): <span id="highScore">0</span></p>
+
+<button id="startBtn">Starta spelet</button>
+<p id="gameMessage" style="color: red; font-weight: bold; margin-top: 10px;"></p>
+
+<h2>Leaderboard</h2>
+
+<h3>Dagliga Total-Score</h3>
+{% if today_total %}
+<ol>
+{% for username, total in today_total %}
+    <li>{{ username }} — {{ total }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade idag än.</p>
+{% endif %}
+
+<h3>Dagliga High-Score</h3>
+{% if today_highscore %}
+<ol>
+{% for username, high in today_highscore %}
+    <li>{{ username }} — {{ high }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade idag än.</p>
+{% endif %}
+
+<h3>All-time Total-Score</h3>
+{% if alltime_total %}
+<ol>
+{% for username, total in alltime_total %}
+    <li>{{ username }} — {{ total }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade än.</p>
+{% endif %}
+
+<h3>All-time High-Score</h3>
+{% if alltime_highscore %}
+<ol>
+{% for username, high in alltime_highscore %}
+    <li>{{ username }} — {{ high }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade än.</p>
+{% endif %}
+
+<p>Notera: Dagens högsta poängvinnare får alla poäng som Viggo coins! Totalpoäng delas proportionellt på 1000 coins.</p>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const gridSize = 20;
+    const tileCount = canvas.width / gridSize;
+
+    let snake = [{x: 10, y: 10}];
+    let velocity = {x: 0, y: 0};
+    let food = {};
+    let score = 0;
+    let running = false;
+    let gameInterval;
+
+    // All-time highscore från backend
+    let highScore = {{ user_highscore }};
+
+    const scoreElem = document.getElementById('score');
+    const recentScoreElem = document.getElementById('recentScore');
+    const highScoreElem = document.getElementById('highScore');
+    const startBtn = document.getElementById('startBtn');
+    const gameMessage = document.getElementById('gameMessage');
+
+    highScoreElem.innerText = highScore;
+
+    function randomFood() {
+        food = {
+            x: Math.floor(Math.random() * tileCount),
+            y: Math.floor(Math.random() * tileCount),
+        };
+        while (snake.some(seg => seg.x === food.x && seg.y === food.y)) {
+            food.x = Math.floor(Math.random() * tileCount);
+            food.y = Math.floor(Math.random() * tileCount);
+        }
+    }
+
+    function resetGame() {
+        snake = [{x: 10, y: 10}];
+        velocity = {x: 0, y: 0};
+        score = 0;
+        running = false;
+        scoreElem.innerText = score;
+        gameMessage.innerText = '';
+        clearInterval(gameInterval);
+        draw();
+    }
+
+    function draw() {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "red";
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+
+        ctx.fillStyle = "green";
+        snake.forEach(seg => {
+            ctx.fillRect(seg.x * gridSize, seg.y * gridSize, gridSize - 2, gridSize - 2);
+        });
+    }
+
+    function gameOver() {
+        clearInterval(gameInterval);
+        running = false;
+        velocity = {x: 0, y: 0};
+        gameMessage.innerText = "Game Over! Klicka på 'Starta spelet' för att spela igen.";
+        recentScoreElem.innerText = score;
+        if (score > highScore) {
+            highScore = score;
+            highScoreElem.innerText = highScore;
+        }
+
+        // Skicka score till server
+        fetch("{{ url_for('snake_submit') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({score: score})
+        })
+        .then(resp => resp.json())
+        .catch(() => console.error('Fel vid sparande av poängen.'));
+    }
+
+    function moveSnake() {
+        if (!running) return;
+        let head = {...snake[0]};
+        head.x += velocity.x;
+        head.y += velocity.y;
+
+        if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) { gameOver(); return; }
+        if (snake.some((seg, idx) => idx!==0 && seg.x===head.x && seg.y===head.y)) { gameOver(); return; }
+
+        snake.unshift(head);
+
+        if (head.x === food.x && head.y === food.y) { score++; scoreElem.innerText = score; randomFood(); }
+        else { snake.pop(); }
+
+        draw();
+    }
+
+    function gameLoop() { moveSnake(); }
+
+    startBtn.addEventListener('click', () => {
+        if (running) return;
+        resetGame();
+        randomFood();
+        velocity = {x: 1, y: 0};
+        running = true;
+        gameInterval = setInterval(gameLoop, 120);
+    });
+
+    window.addEventListener('keydown', e => {
+        if (!running) return;
+        switch(e.key) {
+            case "ArrowUp": if (velocity.y!==1) velocity={x:0,y:-1}; break;
+            case "ArrowDown": if (velocity.y!==-1) velocity={x:0,y:1}; break;
+            case "ArrowLeft": if (velocity.x!==1) velocity={x:-1,y:0}; break;
+            case "ArrowRight": if (velocity.x!==-1) velocity={x:1,y:0}; break;
+        }
+    });
+
+    draw();
+});
+</script>
+{% endblock %}
