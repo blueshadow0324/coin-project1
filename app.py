@@ -570,6 +570,25 @@ def create_marketplace_table():
     db.create_all()
     return "Marketplace table created!"
 
+@app.route('/marketplace/delete/<int:item_id>', methods=['POST'])
+@login_required
+def delete_item(item_id):
+    item = MarketplaceItem.query.get_or_404(item_id)
+
+    if item.seller_id != g.user.id:
+        flash('Du kan bara ta bort dina egna objekt.', 'danger')
+        return redirect(url_for('marketplace'))
+
+    if item.buyer_id is not None:
+        flash('Du kan inte ta bort ett objekt som redan är sålt.', 'warning')
+        return redirect(url_for('marketplace'))
+
+    # Ta bort från DB
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Objektet "{item.title}" har tagits bort.', 'success')
+    return redirect(url_for('marketplace'))
+
 # --- Run app ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
