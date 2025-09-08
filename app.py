@@ -376,10 +376,97 @@ def snake_submit():
 def stats():
     return render_template('stats.html')
 
+
+class MarketplaceItem(db.Model):
+    __tablename__ = "marketplace_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    price = db.Column(db.Integer, nullable=False)
+    image_filename = db.Column(db.String(255), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sold_at = db.Column(db.DateTime, nullable=True)
+
+    # relations
+    seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
+    buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
+
+
 @app.route('/marketplace')
 @login_required
 def marketplace():
-    return render_template('marketplace.html')
+    items = MarketplaceItem.query.filter_by(buyer_id=None).order_by(MarketplaceItem.created_at.desc()).all()
+    return render_template('marketplace.html', items=items, user=g.user)
+
+@app.route('/marketplace/add', methods=['GET', 'POST'])
+@login_required
+def add_item():
+    if request.method == 'POST':
+        title = request.form['title'].strip()
+        description = request.form['description'].strip()
+        price = request.form['price'].strip()
+
+        if not title or not price.isdigit() or int(price) <= 0:
+            flash('Titel och pris krävs (pris måste vara ett positivt heltal).', 'danger')
+            return redirect(url_for('add_item'))
+
+        price = int(price)
+        image = request.files.get('image')
+        image_filename = None
+
+        if image and image.filename != '':
+            filename = secure_filename(image.filename)
+            image_filename = f"{datetime.utcnow().timestamp()}_{filename}"
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
+
+        item = MarketplaceItem(
+            seller_id=g.user.id,
+            title=title,
+            description=description,
+            price=price,
+            image_filename=image_filename
+        )
+        db.session.add(item)
+        db.session.commit()
+        flash('Objekt tillagt i marknaden.', 'success')
+        return redirect(url_for('marketplace'))
+
+    return render_template('add_item.html', user=g.user)
+
+@app.route('/marketplace/buy/<int:item_id>', methods=['POST'])
+@login_required
+def buy_item(item_id):
+    item = MarketplaceItem.query.get_or_404(item_id)
+
+    if item.buyer_id is not None:
+        flash('Denna produkt är redan såld.', 'warning')
+        return redirect(url_for('marketplace'))
+
+    if item.seller_id == g.user.id:
+        flash('Du kan inte köpa dina egna objekt.', 'danger')
+        return redirect(url_for('marketplace'))
+
+    if g.user.coins < item.price:
+        flash('Du har inte tillräckligt med coins.', 'danger')
+        return redirect(url_for('marketplace'))
+
+    # Transfer coins
+    buyer = g.user
+    seller = User.query.get(item.seller_id)
+
+    buyer.coins -= item.price
+    seller.coins += item.price
+    item.buyer_id = buyer.id
+    item.sold_at = datetime.utcnow()
+
+    db.session.commit()
+    flash(f'Du har köpt "{item.title}" för {item.price} coins.', 'success')
+    return redirect(url_for('marketplace'))
 
 @app.route("/download-db-secret")
 def download_db():
