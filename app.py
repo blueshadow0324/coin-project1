@@ -565,6 +565,10 @@ def view_leaderboard():
         output += f"<li>{s.username}: {s.total}</li>"
     output += "</ul>"
     return output
+@app.route("/admin/create-marketplace-table")
+def create_marketplace_table():
+    db.create_all()
+    return "Marketplace table created!"
 
 # --- Run app ---
 if __name__ == '__main__':
