@@ -376,19 +376,25 @@ def snake_submit():
 def stats():
     return render_template('stats.html')
 
+
 class MarketplaceItem(db.Model):
+    __tablename__ = "marketplace_items"
+
     id = db.Column(db.Integer, primary_key=True)
-    seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Null if unsold
-    title = db.Column(db.String(100), nullable=False)
+    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    title = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=True)
     price = db.Column(db.Integer, nullable=False)
     image_filename = db.Column(db.String(255), nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sold_at = db.Column(db.DateTime, nullable=True)
 
-    seller = db.relationship('User', foreign_keys=[seller_id], backref='items_for_sale')
-    buyer = db.relationship('User', foreign_keys=[buyer_id], backref='items_bought')
+    # relations
+    seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
+    buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
 
 
 @app.route('/marketplace')
@@ -397,6 +403,70 @@ def marketplace():
     items = MarketplaceItem.query.filter_by(buyer_id=None).order_by(MarketplaceItem.created_at.desc()).all()
     return render_template('marketplace.html', items=items, user=g.user)
 
+@app.route('/marketplace/add', methods=['GET', 'POST'])
+@login_required
+def add_item():
+    if request.method == 'POST':
+        title = request.form['title'].strip()
+        description = request.form['description'].strip()
+        price = request.form['price'].strip()
+
+        if not title or not price.isdigit() or int(price) <= 0:
+            flash('Titel och pris krävs (pris måste vara ett positivt heltal).', 'danger')
+            return redirect(url_for('add_item'))
+
+        price = int(price)
+        image = request.files.get('image')
+        image_filename = None
+
+        if image and image.filename != '':
+            filename = secure_filename(image.filename)
+            image_filename = f"{datetime.utcnow().timestamp()}_{filename}"
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
+
+        item = MarketplaceItem(
+            seller_id=g.user.id,
+            title=title,
+            description=description,
+            price=price,
+            image_filename=image_filename
+        )
+        db.session.add(item)
+        db.session.commit()
+        flash('Objekt tillagt i marknaden.', 'success')
+        return redirect(url_for('marketplace'))
+
+    return render_template('add_item.html', user=g.user)
+
+@app.route('/marketplace/buy/<int:item_id>', methods=['POST'])
+@login_required
+def buy_item(item_id):
+    item = MarketplaceItem.query.get_or_404(item_id)
+
+    if item.buyer_id is not None:
+        flash('Denna produkt är redan såld.', 'warning')
+        return redirect(url_for('marketplace'))
+
+    if item.seller_id == g.user.id:
+        flash('Du kan inte köpa dina egna objekt.', 'danger')
+        return redirect(url_for('marketplace'))
+
+    if g.user.coins < item.price:
+        flash('Du har inte tillräckligt med coins.', 'danger')
+        return redirect(url_for('marketplace'))
+
+    # Transfer coins
+    buyer = g.user
+    seller = User.query.get(item.seller_id)
+
+    buyer.coins -= item.price
+    seller.coins += item.price
+    item.buyer_id = buyer.id
+    item.sold_at = datetime.utcnow()
+
+    db.session.commit()
+    flash(f'Du har köpt "{item.title}" för {item.price} coins.', 'success')
+    return redirect(url_for('marketplace'))
 
 @app.route("/download-db-secret")
 def download_db():
@@ -495,67 +565,29 @@ def view_leaderboard():
         output += f"<li>{s.username}: {s.total}</li>"
     output += "</ul>"
     return output
-from datetime import timedelta
+@app.route("/admin/create-marketplace-table")
+def create_marketplace_table():
+    db.create_all()
+    return "Marketplace table created!"
 
-@app.route('/admin/simulate-day')
+@app.route('/marketplace/delete/<int:item_id>', methods=['POST'])
 @login_required
-def simulate_day():
-    # Simulate next day
-    today = date.today()
-    simulated_date = today + timedelta(days=1)
+def delete_item(item_id):
+    item = MarketplaceItem.query.get_or_404(item_id)
 
-    # (Optional) You can create some fake snake scores here if you want to test
-    # For example, add random scores for each user
-    users = User.query.all()
-    for user in users:
-        random_score = random.randint(10, 100)
-        score_entry = SnakeScore(user_id=user.id, score=random_score, date=simulated_date)
-        db.session.add(score_entry)
+    if item.seller_id != g.user.id:
+        flash('Du kan bara ta bort dina egna objekt.', 'danger')
+        return redirect(url_for('marketplace'))
 
+    if item.buyer_id is not None:
+        flash('Du kan inte ta bort ett objekt som redan är sålt.', 'warning')
+        return redirect(url_for('marketplace'))
+
+    # Ta bort från DB
+    db.session.delete(item)
     db.session.commit()
-
-    # Now distribute rewards for the simulated date
-
-    # Check if rewards already distributed for simulated date
-    reward_entry = SnakeReward.query.filter_by(date=simulated_date).first()
-    if not reward_entry:
-        reward_entry = SnakeReward(date=simulated_date, distributed=False)
-        db.session.add(reward_entry)
-        db.session.commit()
-
-    if not reward_entry.distributed:
-        # Total score per user for simulated date
-        today_totals = (
-            db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
-            .join(SnakeScore)
-            .filter(SnakeScore.date == simulated_date)
-            .group_by(User.id)
-            .all()
-        )
-
-        if today_totals:
-            total_points = sum([t.total_score for t in today_totals])
-            if total_points > 0:
-                for user_id, total_score in today_totals:
-                    user = User.query.get(user_id)
-                    reward = int(1000 * total_score / total_points)
-                    user.coins += reward
-
-            # Highscore winner gets total points
-            highscore_winner = (
-                db.session.query(User)
-                .join(SnakeScore)
-                .filter(SnakeScore.date == simulated_date)
-                .order_by(SnakeScore.score.desc())
-                .first()
-            )
-            if highscore_winner:
-                highscore_winner.coins += total_points
-
-            reward_entry.distributed = True
-            db.session.commit()
-
-    return f"Simulated day {simulated_date} processed with snake scores and rewards distributed."
+    flash(f'Objektet "{item.title}" har tagits bort.', 'success')
+    return redirect(url_for('marketplace'))
 
 # --- Run app ---
 if __name__ == '__main__':
