@@ -500,9 +500,6 @@ from datetime import timedelta
 @app.route('/admin/simulate-day')
 @login_required
 def simulate_day():
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-
     # Simulate next day
     today = date.today()
     simulated_date = today + timedelta(days=1)
