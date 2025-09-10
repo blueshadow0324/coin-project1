@@ -430,6 +430,9 @@ def add_item():
             description=description,
             price=price,
             image_filename=image_filename
+            seller = db.relationship("User", foreign_keys=[seller_id], backref="sold_items")
+            buyer = db.relationship("User", foreign_keys=[buyer_id], backref="bought_items")
+
         )
         db.session.add(item)
         db.session.commit()

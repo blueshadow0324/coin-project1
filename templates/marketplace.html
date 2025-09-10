@@ -1,39 +1,89 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2>Marketplace</h2>
-<a href="{{ url_for('add_item') }}" class="btn btn-primary mb-3">+ Lägg till objekt</a>
+<h2 class="mb-4">🛍️ Marketplace</h2>
+<a href="{{ url_for('add_item') }}" class="btn btn-primary mb-4">+ Lägg till objekt</a>
 
-{% for item in items %}
-<div class="card mb-3">
-    <div class="card-body">
-        {% if item.image_filename %}
-            <img src="{{ url_for('static', filename='uploads/' ~ item.image_filename) }}"
-                 class="img-thumbnail" style="max-height:150px;">
-        {% endif %}
-        <h5 class="card-title">{{ item.title }}</h5>
-        <p class="card-text">{{ item.description }}</p>
-        <p><strong>Pris:</strong> {{ item.price }} coins</p>
-        <p><strong>Säljare:</strong> {{ item.seller.username }}</p>
+<div class="row">
+    <!-- Tillgängliga objekt -->
+    <div class="col-md-6">
+        <h3>📦 Tillgängliga objekt</h3>
+        {% if items %}
+            {% for item in items %}
+            <div class="card mb-3 shadow-sm">
+                {% if item.image_filename %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item.image_filename) }}"
+                     class="card-img-top" style="max-height:200px; object-fit:cover;">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ item.title }}</h5>
+                    <p class="card-text">{{ item.description }}</p>
+                    <p><strong>Pris:</strong> {{ item.price }} coins</p>
+                    <p><strong>Säljare:</strong> {{ item.seller.username }}</p>
 
-        {% if item.seller_id == user.id %}
-            <small>Du är säljaren</small><br>
-            {% if not item.buyer_id %}
-                <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" style="display:inline;">
-                    <button class="btn btn-danger btn-sm" type="submit">Ta bort</button>
-                </form>
-            {% else %}
-                <small class="text-muted">Objektet är sålt och kan inte tas bort</small>
-            {% endif %}
-        {% elif not item.buyer_id %}
-            <form method="post" action="{{ url_for('buy_item', item_id=item.id) }}" style="display:inline;">
-                <button class="btn btn-success" type="submit">Köp</button>
-            </form>
+                    {% if item.seller_id == user.id %}
+                        <small class="text-muted">Du är säljaren</small><br>
+                        <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" class="mt-2">
+                            <button class="btn btn-danger btn-sm" type="submit">Ta bort</button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{{ url_for('buy_item', item_id=item.id) }}">
+                            <button class="btn btn-success" type="submit">Köp</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
         {% else %}
-            <small class="text-muted">Såld</small>
+            <p>Inga objekt tillgängliga just nu.</p>
+        {% endif %}
+    </div>
+
+    <!-- Dina köpta objekt -->
+    <div class="col-md-6">
+        <h3>🛒 Dina köpta objekt</h3>
+        {% set bought_items = user.bought_items %}
+        {% if bought_items %}
+            {% for item in bought_items %}
+            <div class="card mb-3 shadow-sm border-success">
+                {% if item.image_filename %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item.image_filename) }}"
+                     class="card-img-top" style="max-height:200px; object-fit:cover;">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ item.title }}</h5>
+                    <p class="card-text">{{ item.description }}</p>
+                    <p><strong>Pris:</strong> {{ item.price }} coins</p>
+                    <p><strong>Säljare:</strong> {{ item.seller.username }}</p>
+                    <span class="badge bg-success">Köpt</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>Du har inte köpt några objekt än.</p>
+        {% endif %}
+
+        <h3 class="mt-4">💼 Dina sålda objekt</h3>
+        {% set sold_items = user.sold_items | selectattr("buyer_id", "ne", None) | list %}
+        {% if sold_items %}
+            {% for item in sold_items %}
+            <div class="card mb-3 shadow-sm border-info">
+                {% if item.image_filename %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item.image_filename) }}"
+                     class="card-img-top" style="max-height:200px; object-fit:cover;">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ item.title }}</h5>
+                    <p class="card-text">{{ item.description }}</p>
+                    <p><strong>Pris:</strong> {{ item.price }} coins</p>
+                    <p><strong>Köpare:</strong> {{ item.buyer.username }}</p>
+                    <span class="badge bg-info">Såld</span>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>Du har inte sålt några objekt än.</p>
         {% endif %}
     </div>
 </div>
-{% else %}
-<p>Inga objekt tillgängliga just nu.</p>
-{% endfor %}
 {% endblock %}
