@@ -596,6 +596,10 @@ from datetime import date, timedelta
 import random
 from sqlalchemy import func
 
+from flask import abort, g
+from datetime import date, timedelta
+from sqlalchemy import func
+
 @app.route('/admin/simulate-day')
 @login_required
 def simulate_day():
@@ -606,14 +610,7 @@ def simulate_day():
     # Simulate the next day
     simulated_date = date.today() + timedelta(days=1)
 
-    # Generate random snake scores for all users
-    users = User.query.all()
-    for user in users:
-        score = random.randint(10, 100)
-        db.session.add(SnakeScore(user_id=user.id, score=score, date=simulated_date))
-    db.session.commit()
-
-    # Check if rewards have already been distributed for this date
+    # Check if rewards have already been distributed
     reward_entry = SnakeReward.query.filter_by(date=simulated_date).first()
     if not reward_entry:
         reward_entry = SnakeReward(date=simulated_date, distributed=False)
@@ -621,7 +618,7 @@ def simulate_day():
         db.session.commit()
 
     if not reward_entry.distributed:
-        # Calculate total score per user
+        # Get total score per user for the simulated date
         user_scores = (
             db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
             .join(SnakeScore)
@@ -654,6 +651,7 @@ def simulate_day():
             db.session.commit()
 
     return f"Simulated day {simulated_date} processed successfully for William0."
+
 
 
 
