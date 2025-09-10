@@ -590,40 +590,69 @@ def delete_item(item_id):
     return redirect(url_for('marketplace'))
 
 from datetime import timedelta
-
-@app.route('/admin/simulate-day')
+@app.route('/admin/simulate-day') 
 @login_required
 def simulate_day():
-    # Simulate next day
-    today = date.today()
-    simulated_date = today + timedelta(days=1)
+    try:
+        if g.user.username != ADMIN_USERNAME:
+            abort(403)
 
-    # Now distribute rewards for the simulated date
+        # Simulate next day
+        today = date.today()
+        simulated_date = today + timedelta(days=1)
 
-    # Check if rewards already distributed for simulated date
-    reward_entry = SnakeReward.query.filter_by(date=simulated_date).first()
-    if not reward_entry:
-        reward_entry = SnakeReward(date=simulated_date, distributed=False)
-        db.session.add(reward_entry)
+        users = User.query.all()
+        for user in users:
+            random_score = random.randint(10, 100)
+            score_entry = SnakeScore(user_id=user.id, score=random_score, date=simulated_date)
+            db.session.add(score_entry)
+
         db.session.commit()
 
-    if not reward_entry.distributed:
-        # Total score per user for simulated date
-        today_totals = (
-            db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
-            .join(SnakeScore)
-            .filter(SnakeScore.date == simulated_date)
-            .group_by(User.id)
-            .all()
-        )
+        reward_entry = SnakeReward.query.filter_by(date=simulated_date).first()
+        if not reward_entry:
+            reward_entry = SnakeReward(date=simulated_date, distributed=False)
+            db.session.add(reward_entry)
+            db.session.commit()
 
-        if today_totals:
-            total_points = sum([t.total_score for t in today_totals])
-            if total_points > 0:
-                for user_id, total_score in today_totals:
-                    user = User.query.get(user_id)
-                    reward = int(1000 * total_score / total_points)
-                    user.coins += reward
+        if not reward_entry.distributed:
+            today_totals = (
+                db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
+                .join(SnakeScore)
+                .filter(SnakeScore.date == simulated_date)
+                .group_by(User.id)
+                .all()
+            )
+
+            if today_totals:
+                total_points = sum([t.total_score for t in today_totals])
+                if total_points > 0:
+                    for user_id, total_score in today_totals:
+                        user = User.query.get(user_id)
+                        reward = int(1000 * total_score / total_points)
+                        user.coins += reward
+
+                highscore_winner = (
+                    db.session.query(User)
+                    .join(SnakeScore)
+                    .filter(SnakeScore.date == simulated_date)
+                    .order_by(SnakeScore.score.desc())
+                    .first()
+                )
+                if highscore_winner:
+                    highscore_winner.coins += total_points
+
+                reward_entry.distributed = True
+                db.session.commit()
+
+        return f"Simulated day {simulated_date} processed with snake scores and rewards distributed."
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"An error occurred: {str(e)}", 500
+
+
 
 
 # --- Run app ---
