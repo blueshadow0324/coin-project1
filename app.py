@@ -257,28 +257,37 @@ from datetime import date
 @app.route('/snake', methods=['GET'])
 @login_required
 def snake():
-    today = date.today()
+    # Allow ?day=YYYY-MM-DD in the URL
+    day_str = request.args.get("day")
+    if day_str:
+        try:
+            selected_date = datetime.strptime(day_str, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
 
-    # Today Total
+    # Daily Total
     today_total = (
         db.session.query(User.username, func.sum(SnakeScore.score).label('total'))
         .join(SnakeScore)
-        .filter(SnakeScore.date == today)
+        .filter(SnakeScore.date == selected_date)
         .group_by(User.id)
         .order_by(func.sum(SnakeScore.score).desc())
         .all()
     )
 
-    # Today Highscore
+    # Daily Highscore
     today_highscore = (
         db.session.query(User.username, func.max(SnakeScore.score).label('highscore'))
         .join(SnakeScore)
-        .filter(SnakeScore.date == today)
+        .filter(SnakeScore.date == selected_date)
         .group_by(User.id)
         .order_by(func.max(SnakeScore.score).desc())
         .all()
     )
 
+    # All-time total
     alltime_total = (
         db.session.query(User.username, func.sum(SnakeScore.score).label('total'))
         .join(SnakeScore)
@@ -287,7 +296,7 @@ def snake():
         .all()
     )
 
-    # All-time Highscore
+    # All-time highscore
     alltime_highscore = (
         db.session.query(User.username, func.max(SnakeScore.score).label('highscore'))
         .join(SnakeScore)
@@ -296,19 +305,24 @@ def snake():
         .all()
     )
 
-    user_highscore = db.session.query(func.max(SnakeScore.score)).filter(
-        SnakeScore.user_id == g.user.id
-    ).scalar() or 0
+    user_highscore = (
+        db.session.query(func.max(SnakeScore.score))
+        .filter(SnakeScore.user_id == g.user.id)
+        .scalar()
+        or 0
+    )
 
     return render_template(
-        'snake.html',
+        "snake.html",
         today_total=today_total,
         today_highscore=today_highscore,
         alltime_total=alltime_total,
         alltime_highscore=alltime_highscore,
         user=g.user,
-        user_highscore=user_highscore
+        user_highscore=user_highscore,
+        selected_date=selected_date,  # <-- Pass date to template
     )
+
 
 # --- Submit snake score ---
 @app.route('/snake/submit', methods=['POST'])
