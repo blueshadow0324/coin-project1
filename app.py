@@ -601,14 +601,6 @@ def simulate_day():
         today = date.today()
         simulated_date = today + timedelta(days=1)
 
-        users = User.query.all()
-        for user in users:
-            random_score = random.randint(10, 100)
-            score_entry = SnakeScore(user_id=user.id, score=random_score, date=simulated_date)
-            db.session.add(score_entry)
-
-        db.session.commit()
-
         reward_entry = SnakeReward.query.filter_by(date=simulated_date).first()
         if not reward_entry:
             reward_entry = SnakeReward(date=simulated_date, distributed=False)
