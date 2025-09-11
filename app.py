@@ -1,15 +1,19 @@
- # app.py
 import os
-from datetime import datetime, date
-from functools import wraps
 import random
-from flask import Flask, render_template, request, redirect, url_for, session, flash, g, jsonify, send_file, abort
+import shutil
+from datetime import datetime, date, timedelta
+from functools import wraps
+
+from flask import (
+    Flask, render_template, request, redirect, url_for, session, flash, g,
+    jsonify, send_file, abort
+)
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import func
 
-# Flask app
+# Flask app setup
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
@@ -38,8 +42,10 @@ class User(db.Model):
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -48,11 +54,13 @@ class Transaction(db.Model):
     amount = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class SnakeScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -60,10 +68,12 @@ class SnakeScore(db.Model):
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
+
 class SnakeReward(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, unique=True, nullable=False)
     distributed = db.Column(db.Boolean, default=False)
+
 
 # Login required decorator
 def login_required(f):
@@ -75,10 +85,12 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 @app.before_request
 def load_logged_in_user():
     user_id = session.get('user_id')
     g.user = User.query.get(user_id) if user_id else None
+
 
 # CLI command to create DB
 @app.cli.command('init-db')
@@ -86,14 +98,17 @@ def init_db():
     db.create_all()
     print("Databasen är skapad!")
 
+
 # --- Utility ---
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 # --- Routes ---
 @app.route('/')
 def index():
     return redirect(url_for('dashboard') if g.user else url_for('login'))
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -120,6 +135,7 @@ def register():
         return redirect(url_for('login'))
     return render_template('register.html')
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if g.user:
@@ -137,12 +153,14 @@ def login():
         return redirect(url_for('dashboard'))
     return render_template('login.html')
 
+
 @app.route('/logout')
 @login_required
 def logout():
     session.clear()
     flash('Du är utloggad.', 'info')
     return redirect(url_for('login'))
+
 
 @app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
@@ -176,12 +194,14 @@ def dashboard():
         return redirect(url_for('dashboard'))
     return render_template('dashboard.html', user=g.user)
 
+
 @app.route('/transactions')
 @login_required
 def transactions():
     sent = Transaction.query.filter_by(sender_id=g.user.id).order_by(Transaction.timestamp.desc()).all()
     received = Transaction.query.filter_by(receiver_id=g.user.id).order_by(Transaction.timestamp.desc()).all()
     return render_template('transactions.html', sent=sent, received=received, user=g.user)
+
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
@@ -204,6 +224,7 @@ def change_password():
         flash('Lösenordet ändrades.', 'success')
         return redirect(url_for('dashboard'))
     return render_template('change_password.html')
+
 
 @app.route('/dice', methods=['GET', 'POST'])
 @login_required
@@ -234,6 +255,7 @@ def dice():
         db.session.commit()
     return render_template('dice.html', result=result, rolled_number=rolled_number, guess=guess, bet=bet, user=g.user)
 
+
 @app.route('/chat', methods=['GET', 'POST'])
 @login_required
 def chat():
@@ -250,44 +272,31 @@ def chat():
     messages = Message.query.order_by(Message.timestamp.asc()).limit(50).all()
     return render_template('chat.html', messages=messages, user=g.user)
 
-from sqlalchemy import func
-from datetime import date
 
 # --- Snake leaderboard page ---
 @app.route('/snake', methods=['GET'])
 @login_required
 def snake():
-    # Allow ?day=YYYY-MM-DD in the URL
-    day_str = request.args.get("day")
-    if day_str:
-        try:
-            selected_date = datetime.strptime(day_str, "%Y-%m-%d").date()
-        except ValueError:
-            selected_date = date.today()
-    else:
-        selected_date = date.today()
+    today = date.today()
 
-    # Daily Total
     today_total = (
         db.session.query(User.username, func.sum(SnakeScore.score).label('total'))
         .join(SnakeScore)
-        .filter(SnakeScore.date == selected_date)
+        .filter(SnakeScore.date == today)
         .group_by(User.id)
         .order_by(func.sum(SnakeScore.score).desc())
         .all()
     )
 
-    # Daily Highscore
     today_highscore = (
         db.session.query(User.username, func.max(SnakeScore.score).label('highscore'))
         .join(SnakeScore)
-        .filter(SnakeScore.date == selected_date)
+        .filter(SnakeScore.date == today)
         .group_by(User.id)
         .order_by(func.max(SnakeScore.score).desc())
         .all()
     )
 
-    # All-time total
     alltime_total = (
         db.session.query(User.username, func.sum(SnakeScore.score).label('total'))
         .join(SnakeScore)
@@ -296,7 +305,6 @@ def snake():
         .all()
     )
 
-    # All-time highscore
     alltime_highscore = (
         db.session.query(User.username, func.max(SnakeScore.score).label('highscore'))
         .join(SnakeScore)
@@ -305,369 +313,144 @@ def snake():
         .all()
     )
 
-    user_highscore = (
-        db.session.query(func.max(SnakeScore.score))
-        .filter(SnakeScore.user_id == g.user.id)
-        .scalar()
-        or 0
-    )
-
-    return render_template(
-        "snake.html",
-        today_total=today_total,
-        today_highscore=today_highscore,
-        alltime_total=alltime_total,
-        alltime_highscore=alltime_highscore,
-        user=g.user,
-        user_highscore=user_highscore,
-        selected_date=selected_date,  # <-- Pass date to template
-    )
+    return render_template('snake.html',
+                           today_total=today_total,
+                           today_highscore=today_highscore,
+                           alltime_total=alltime_total,
+                           alltime_highscore=alltime_highscore,
+                           user=g.user)
 
 
-# --- Submit snake score ---
-@app.route('/snake/submit', methods=['POST'])
-@login_required
-def snake_submit():
-    data = request.get_json()
-    score = data.get('score')
-    if not isinstance(score, int) or score < 0:
-        return jsonify({'error': 'Invalid score'}), 400
+# --- Admin-only decorator ---
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Replace this with your actual admin check logic
+        if not g.user or g.user.username != 'admin':
+            flash('Endast administratörer har tillgång.', 'danger')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
-    today = date.today()
 
-    # Save the new score
-    new_score = SnakeScore(user_id=g.user.id, score=score, date=today)
-    db.session.add(new_score)
-    db.session.commit()
+# --- Admin: simulate day ---
+@app.route('/admin/simulate-day', methods=['GET', 'POST'])
+@admin_required
+def simulate_day():
+    if request.method == 'POST':
+        date_str = request.form.get('date', '').strip()
+        try:
+            simulated_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Ogiltigt datumformat. Använd ÅÅÅÅ-MM-DD.', 'danger')
+            return redirect(url_for('simulate_day'))
 
-    # --- Distribute rewards only once per day ---
-    reward_entry = SnakeReward.query.filter_by(date=today).first()
-    if not reward_entry:
-        reward_entry = SnakeReward(date=today, distributed=False)
-        db.session.add(reward_entry)
+        # Check if rewards have already been distributed for this date
+        reward_record = SnakeReward.query.filter_by(date=simulated_date).first()
+        if reward_record and reward_record.distributed:
+            flash(f"Belöningar för {simulated_date} har redan distribuerats.", "warning")
+            return redirect(url_for('simulate_day'))
+
+        users = User.query.all()
+        if not users:
+            flash("Inga användare finns för att simulera.", "danger")
+            return redirect(url_for('simulate_day'))
+
+        # Add random scores only for users who do NOT already have a score for this date
+        added_scores = 0
+        for user in users:
+            existing_score = SnakeScore.query.filter_by(user_id=user.id, date=simulated_date).first()
+            if existing_score:
+                continue  # Skip if score already exists
+            random_score = random.randint(10, 100)
+            new_score = SnakeScore(user_id=user.id, score=random_score, date=simulated_date)
+            db.session.add(new_score)
+            added_scores += 1
+
         db.session.commit()
 
-    if not reward_entry.distributed:
-        # Total score per user today
-        today_totals = (
-            db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
-            .join(SnakeScore)
-            .filter(SnakeScore.date == today)
-            .group_by(User.id)
+        # Calculate leaderboard for the simulated date
+        leaderboard = (
+            db.session.query(SnakeScore.user_id, func.sum(SnakeScore.score).label('total_score'))
+            .filter(SnakeScore.date == simulated_date)
+            .group_by(SnakeScore.user_id)
+            .order_by(func.sum(SnakeScore.score).desc())
+            .limit(5)
             .all()
         )
 
-        if today_totals:
-            # Total points today
-            total_points = sum([t.total_score for t in today_totals])
+        if not leaderboard:
+            flash(f"Inga poäng finns för datumet {simulated_date}.", "warning")
+            return redirect(url_for('simulate_day'))
 
-            # 1. Distribute 1000 Viggo coins proportionally to total score
-            if total_points > 0:
-                for user_id, total_score in today_totals:
-                    user = User.query.get(user_id)
-                    reward = int(1000 * total_score / total_points)
-                    user.coins += reward
+        # Distribute rewards to top 5 players
+        for rank, (user_id, total_score) in enumerate(leaderboard, start=1):
+            reward_amount = 150 - (rank - 1) * 20  # 1st:150, 2nd:130, ..., 5th:70
+            user = User.query.get(user_id)
+            if user:
+                user.coins += reward_amount
+                # Optional: add a message for the reward
+                msg_content = f"Belöning för Snake Leaderboard på {simulated_date}: {reward_amount} coins för plats {rank}."
+                msg = Message(user_id=user.id, content=msg_content)
+                db.session.add(msg)
 
-            # 2. Highscore winner today gets total points as Viggo coins
-            highscore_winner = (
-                db.session.query(User)
-                .join(SnakeScore)
-                .filter(SnakeScore.date == today)
-                .order_by(SnakeScore.score.desc())
-                .first()
-            )
-            if highscore_winner:
-                highscore_winner.coins += total_points
+        # Mark rewards as distributed for that date
+        if not reward_record:
+            reward_record = SnakeReward(date=simulated_date, distributed=True)
+        else:
+            reward_record.distributed = True
+        db.session.add(reward_record)
 
-            # Mark rewards as distributed
-            reward_entry.distributed = True
-            db.session.commit()
-
-    return jsonify({'message': 'Score saved', 'score': score})
-
-@app.route('/stats')
-@login_required
-def stats():
-    return render_template('stats.html')
-
-
-class MarketplaceItem(db.Model):
-    __tablename__ = "marketplace_items"
-
-    id = db.Column(db.Integer, primary_key=True)
-    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-
-    title = db.Column(db.String(120), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    price = db.Column(db.Integer, nullable=False)
-    image_filename = db.Column(db.String(255), nullable=True)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    sold_at = db.Column(db.DateTime, nullable=True)
-
-    # relations
-    seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
-    buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
-
-
-@app.route('/marketplace')
-@login_required
-def marketplace():
-    items = MarketplaceItem.query.filter_by(buyer_id=None).order_by(MarketplaceItem.created_at.desc()).all()
-    return render_template('marketplace.html', items=items, user=g.user)
-
-@app.route('/marketplace/add', methods=['GET', 'POST'])
-@login_required
-def add_item():
-    if request.method == 'POST':
-        title = request.form['title'].strip()
-        description = request.form['description'].strip()
-        price = request.form['price'].strip()
-
-        if not title or not price.isdigit() or int(price) <= 0:
-            flash('Titel och pris krävs (pris måste vara ett positivt heltal).', 'danger')
-            return redirect(url_for('add_item'))
-
-        price = int(price)
-        image = request.files.get('image')
-        image_filename = None
-
-        if image and image.filename != '':
-            filename = secure_filename(image.filename)
-            image_filename = f"{datetime.utcnow().timestamp()}_{filename}"
-            image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
-
-        item = MarketplaceItem(
-            seller_id=g.user.id,
-            title=title,
-            description=description,
-            price=price,
-            image_filename=image_filename
-        )
-        db.session.add(item)
         db.session.commit()
-        flash('Objekt tillagt i marknaden.', 'success')
-        return redirect(url_for('marketplace'))
 
-    return render_template('add_item.html', user=g.user)
+        flash(f"Simulering för {simulated_date} klar. {added_scores} poäng lades till och belöningar distribuerades.", "success")
+        return redirect(url_for('simulate_day'))
 
-@app.route('/marketplace/buy/<int:item_id>', methods=['POST'])
-@login_required
-def buy_item(item_id):
-    item = MarketplaceItem.query.get_or_404(item_id)
+    return render_template('simulate_day.html')
 
-    if item.buyer_id is not None:
-        flash('Denna produkt är redan såld.', 'warning')
-        return redirect(url_for('marketplace'))
 
-    if item.seller_id == g.user.id:
-        flash('Du kan inte köpa dina egna objekt.', 'danger')
-        return redirect(url_for('marketplace'))
+# --- Admin: Upload database file ---
+@app.route('/admin/upload', methods=['GET', 'POST'])
+@admin_required
+def upload():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('Ingen fil vald.', 'danger')
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            flash('Ingen fil vald.', 'danger')
+            return redirect(request.url)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
 
-    if g.user.coins < item.price:
-        flash('Du har inte tillräckligt med coins.', 'danger')
-        return redirect(url_for('marketplace'))
+            # Replace current database file with uploaded one
+            db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            shutil.move(filepath, db_path)
 
-    # Transfer coins
-    buyer = g.user
-    seller = User.query.get(item.seller_id)
+            flash('Databasfil uppladdad och ersatt.', 'success')
+            return redirect(url_for('upload'))
+        else:
+            flash('Endast .db filer är tillåtna.', 'danger')
+            return redirect(request.url)
+    return render_template('upload.html')
 
-    buyer.coins -= item.price
-    seller.coins += item.price
-    item.buyer_id = buyer.id
-    item.sold_at = datetime.utcnow()
 
-    db.session.commit()
-    flash(f'Du har köpt "{item.title}" för {item.price} coins.', 'success')
-    return redirect(url_for('marketplace'))
-
-@app.route("/download-db-secret")
-def download_db():
-    return send_file("database.db", as_attachment=True)
-
+# --- Error handlers ---
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
 
-# --- Admin Routes (temporary for Render) ---
-ADMIN_USERNAME = "YOUR_ADMIN_USERNAME"  # change this
 
-# Add this to your app.py
-import os
-import shutil
-from flask import Flask, request, redirect, url_for, flash, render_template, g
-from functools import wraps
-
-# --- Ensure this path matches your SQLALCHEMY_DATABASE_URI ---
-ACTIVE_DB_PATH = "/opt/render/project/src/database.db"  # cloud DB path
-
-# --- Admin decorator ---
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not g.user or g.user.username != "admin":  # replace "admin" with your admin username
-            flash("Admin access required", "danger")
-            return redirect(url_for("dashboard"))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# --- Upload route ---
-@app.route('/admin/upload-db', methods=['GET', 'POST'])
-@admin_required
-def admin_upload_db():
-    if request.method == "POST":
-        if "db_file" not in request.files:
-            flash("No file part", "danger")
-            return redirect(request.url)
-
-        file = request.files["db_file"]
-        if file.filename == "":
-            flash("No selected file", "danger")
-            return redirect(request.url)
-
-        if file and file.filename.endswith(".db"):
-            # Save temporarily
-            uploads_folder = os.path.join(os.path.dirname(ACTIVE_DB_PATH), "uploads")
-            os.makedirs(uploads_folder, exist_ok=True)
-            temp_path = os.path.join(uploads_folder, file.filename)
-            file.save(temp_path)
-
-            # Backup current DB just in case
-            backup_path = os.path.join(uploads_folder, f"database_backup_{file.filename}")
-            if os.path.exists(ACTIVE_DB_PATH):
-                shutil.copy(ACTIVE_DB_PATH, backup_path)
-
-            # Overwrite active cloud DB
-            shutil.copy(temp_path, ACTIVE_DB_PATH)
-
-            flash("Database successfully uploaded and active!", "success")
-            return redirect(url_for("admin_upload_db"))
-        else:
-            flash("Invalid file type. Only .db files are allowed.", "danger")
-            return redirect(request.url)
-
-    return render_template("admin_upload_db.html")
+@app.errorhandler(500)
+def internal_error(e):
+    db.session.rollback()
+    return render_template('500.html'), 500
 
 
-@app.route('/admin/reset-coins')
-@login_required
-def reset_coins():
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-    for u in User.query.all():
-        u.coins = 500
-    db.session.commit()
-    return "Coins reset to 500 for all users!"
-
-@app.route('/admin/view-leaderboard')
-@login_required
-def view_leaderboard():
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-    today = date.today()
-    leaderboard = (
-        db.session.query(User.username, func.sum(SnakeScore.score).label('total'))
-        .join(SnakeScore)
-        .filter(SnakeScore.date == today)
-        .group_by(User.id)
-        .order_by(func.sum(SnakeScore.score).desc())
-        .all()
-    )
-    output = "<h2>Today's Snake Leaderboard</h2><ul>"
-    for s in leaderboard:
-        output += f"<li>{s.username}: {s.total}</li>"
-    output += "</ul>"
-    return output
-@app.route("/admin/create-marketplace-table")
-def create_marketplace_table():
-    db.create_all()
-    return "Marketplace table created!"
-
-@app.route('/marketplace/delete/<int:item_id>', methods=['POST'])
-@login_required
-def delete_item(item_id):
-    item = MarketplaceItem.query.get_or_404(item_id)
-
-    if item.seller_id != g.user.id:
-        flash('Du kan bara ta bort dina egna objekt.', 'danger')
-        return redirect(url_for('marketplace'))
-
-    if item.buyer_id is not None:
-        flash('Du kan inte ta bort ett objekt som redan är sålt.', 'warning')
-        return redirect(url_for('marketplace'))
-
-    # Ta bort från DB
-    db.session.delete(item)
-    db.session.commit()
-    flash(f'Objektet "{item.title}" har tagits bort.', 'success')
-    return redirect(url_for('marketplace'))
-
-from datetime import timedelta
-
-from flask import abort, g
-from datetime import date, timedelta
-import random
-from sqlalchemy import func
-
-from flask import abort, g
-from datetime import date, timedelta
-from sqlalchemy import func
-
-@app.route('/admin/close-day')
-@login_required
-def close_day():
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-
-    today = date.today()
-
-    reward_entry = SnakeReward.query.filter_by(date=today).first()
-    if not reward_entry:
-        reward_entry = SnakeReward(date=today, distributed=False)
-        db.session.add(reward_entry)
-        db.session.commit()
-
-    if not reward_entry.distributed:
-        today_totals = (
-            db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
-            .join(SnakeScore)
-            .filter(SnakeScore.date == today)
-            .group_by(User.id)
-            .all()
-        )
-
-        if today_totals:
-            total_points = sum([t.total_score for t in today_totals])
-
-            # 1. Proportionellt 1000 coins
-            if total_points > 0:
-                for user_id, total_score in today_totals:
-                    user = User.query.get(user_id)
-                    reward = int(1000 * total_score / total_points)
-                    user.coins += reward
-
-            # 2. Highscore-vinnaren får total_points extra
-            highscore_winner = (
-                db.session.query(User)
-                .join(SnakeScore)
-                .filter(SnakeScore.date == today)
-                .order_by(SnakeScore.score.desc())
-                .first()
-            )
-            if highscore_winner:
-                highscore_winner.coins += total_points
-
-            reward_entry.distributed = True
-            db.session.commit()
-
-        return f"Day {today} closed, rewards distributed!"
-    else:
-        return f"Day {today} already closed!"
-
-
-
-
-# --- Run app ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
+    app.run(debug=True)
