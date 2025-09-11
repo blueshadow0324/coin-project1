@@ -600,57 +600,56 @@ from flask import abort, g
 from datetime import date, timedelta
 from sqlalchemy import func
 
-@app.route('/admin/simulate-day')
+@app.route('/admin/close-day')
 @login_required
-def simulate_day():
-    # Only allow access for user "William0"
-    if g.user.username != "William0":
+def close_day():
+    if g.user.username != ADMIN_USERNAME:
         abort(403)
 
-    # Simulate the next day
-    simulated_date = date.today() + timedelta(days=1)
+    today = date.today()
 
-    # Check if rewards have already been distributed
-    reward_entry = SnakeReward.query.filter_by(date=simulated_date).first()
+    reward_entry = SnakeReward.query.filter_by(date=today).first()
     if not reward_entry:
-        reward_entry = SnakeReward(date=simulated_date, distributed=False)
+        reward_entry = SnakeReward(date=today, distributed=False)
         db.session.add(reward_entry)
         db.session.commit()
 
     if not reward_entry.distributed:
-        # Get total score per user for the simulated date
-        user_scores = (
+        today_totals = (
             db.session.query(User.id, func.sum(SnakeScore.score).label('total_score'))
             .join(SnakeScore)
-            .filter(SnakeScore.date == simulated_date)
+            .filter(SnakeScore.date == today)
             .group_by(User.id)
             .all()
         )
 
-        total_points = sum(score.total_score for score in user_scores)
+        if today_totals:
+            total_points = sum([t.total_score for t in today_totals])
 
-        # Distribute proportional rewards
-        if total_points > 0:
-            for user_id, total_score in user_scores:
-                user = User.query.get(user_id)
-                reward = int(1000 * total_score / total_points)
-                user.coins += reward
+            # 1. Proportionellt 1000 coins
+            if total_points > 0:
+                for user_id, total_score in today_totals:
+                    user = User.query.get(user_id)
+                    reward = int(1000 * total_score / total_points)
+                    user.coins += reward
 
-            # Bonus for highest individual score
-            top_user = (
+            # 2. Highscore-vinnaren får total_points extra
+            highscore_winner = (
                 db.session.query(User)
                 .join(SnakeScore)
-                .filter(SnakeScore.date == simulated_date)
+                .filter(SnakeScore.date == today)
                 .order_by(SnakeScore.score.desc())
                 .first()
             )
-            if top_user:
-                top_user.coins += total_points
+            if highscore_winner:
+                highscore_winner.coins += total_points
 
             reward_entry.distributed = True
             db.session.commit()
 
-    return f"Simulated day {simulated_date} processed successfully for William0."
+        return f"Day {today} closed, rewards distributed!"
+    else:
+        return f"Day {today} already closed!"
 
 
 
