@@ -575,10 +575,61 @@ from flask import abort, g
 from datetime import date, timedelta
 from sqlalchemy import func
 
+class FlappyScore(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+
+    user = db.relationship('User', backref='flappy_scores')
+
 @app.route("/flappy")
 @login_required
 def flappy():
-    return render_template("flappy.html", user=g.user)
+    # Get all-time highscore leaderboard
+    highscore_list = (
+        db.session.query(User.username, func.max(FlappyScore.score).label("high"))
+        .join(FlappyScore)
+        .group_by(User.id)
+        .order_by(func.max(FlappyScore.score).desc())
+        .all()
+    )
+
+    # Get user all-time highscore
+    user_highscore = (
+        db.session.query(func.max(FlappyScore.score))
+        .filter(FlappyScore.user_id == g.user.id)
+        .scalar()
+        or 0
+    )
+
+    return render_template(
+        "flappy.html",
+        user=g.user,
+        highscore_list=highscore_list,
+        user_highscore=user_highscore
+    )
+
+@app.route("/flappy/submit", methods=["POST"])
+@login_required
+def flappy_submit():
+    data = request.get_json()
+    score = data.get("score")
+
+    if not isinstance(score, int) or score < 0:
+        return jsonify({"error": "Invalid score"}), 400
+
+    today = date.today()
+
+    # Save score in DB
+    new_score = FlappyScore(user_id=g.user.id, score=score, date=today)
+    g.user.coins += score  # 1 coin per score
+    db.session.add(new_score)
+    db.session.commit()
+
+    return jsonify({"message": "Score saved", "score": score, "coins": g.user.coins})
+
+
 
 
 @app.route('/admin/close-day', methods=['POST'])
@@ -642,23 +693,11 @@ def toggle_ui():
     flash(f"Switched to {g.user.ui_mode} mode!", "success")
     return redirect(url_for("snake"))
 
-from sqlalchemy import text
+@app.route("/admin/create-flappy-table")
+def create_flappy_table():
+    db.create_all()
+    return "FlappyScore table created!"
 
-@app.route("/admin/add-ui-mode-column")
-@login_required
-def add_ui_mode_column():
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-
-    # Check if column exists first
-    try:
-        db.session.execute(text('SELECT ui_mode FROM "user" LIMIT 1'))
-        return 'Column "ui_mode" already exists!'
-    except:
-        # Add column manually with double quotes
-        db.session.execute(text('ALTER TABLE "user" ADD COLUMN ui_mode TEXT DEFAULT \'legacy\''))
-        db.session.commit()
-        return 'Column "ui_mode" added to user table!'
 
 
 

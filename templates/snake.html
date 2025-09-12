@@ -1,153 +1,66 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
+<h1>Snake - Spela och tjäna poäng</h1>
 
-    <h1>Snake - Spela och tjäna poäng</h1>
+<p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
 
-    <p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
+<canvas id="gameCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
 
-    <canvas id="gameCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+<p>Poäng: <span id="score">0</span></p>
+<p>Senaste spel: <span id="recentScore">-</span></p>
+<p>Högsta poäng (all-time): <span id="highScore">0</span></p>
 
-    <p>Poäng: <span id="score">0</span></p>
-    <p>Senaste spel: <span id="recentScore">-</span></p>
-    <p>Högsta poäng (all-time): <span id="highScore">0</span></p>
+<button id="startBtn">Starta spelet</button>
+<p id="gameMessage" style="color: red; font-weight: bold; margin-top: 10px;"></p>
 
-    <button id="startBtn" class="btn btn-primary">Starta spelet</button>
-    <p id="gameMessage" style="color: red; font-weight: bold; margin-top: 10px;"></p>
+<h2>Leaderboard</h2>
 
-    <!-- Toggle UI Mode -->
-    <a href="{{ url_for('toggle_ui') }}" class="btn btn-secondary btn-sm my-3">
-        Växla till {% if ui_mode == 'modern' %}Legacy{% else %}Modern{% endif %} Version
-    </a>
+<h3>Dagliga Total-Score</h3>
+{% if today_total %}
+<ol>
+{% for username, total in today_total %}
+    <li>{{ username }} — {{ total }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade idag än.</p>
+{% endif %}
 
-    {% if ui_mode == 'modern' %}
-    <!-- Modern Tabbed Leaderboard -->
-    <ul class="nav nav-tabs" id="leaderboardTabs" role="tablist">
-        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#today-total">Dagliga Total</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#today-highscore">Dagliga Highscore</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#alltime-total">All-time Total</a></li>
-        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#alltime-highscore">All-time Highscore</a></li>
-    </ul>
+<h3>Dagliga High-Score</h3>
+{% if today_highscore %}
+<ol>
+{% for username, high in today_highscore %}
+    <li>{{ username }} — {{ high }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade idag än.</p>
+{% endif %}
 
-    <div class="tab-content border p-3 rounded-bottom mt-2">
-        <!-- Today Total -->
-        <div class="tab-pane fade show active" id="today-total">
-            {% if today_total %}
-            <ol>
-                {% for username, total in today_total %}
-                    <li>{{ username }} — {{ total }} poäng</li>
-                {% endfor %}
-            </ol>
-            {% else %}
-            <p>Inga poäng registrerade idag än.</p>
-            {% endif %}
-        </div>
+<h3>All-time Total-Score</h3>
+{% if alltime_total %}
+<ol>
+{% for username, total in alltime_total %}
+    <li>{{ username }} — {{ total }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade än.</p>
+{% endif %}
 
-        <!-- Today Highscore -->
-        <div class="tab-pane fade" id="today-highscore">
-            {% if today_highscore %}
-            <ol>
-                {% for username, high in today_highscore %}
-                    <li>{{ username }} — {{ high }} poäng</li>
-                {% endfor %}
-            </ol>
-            {% else %}
-            <p>Inga poäng registrerade idag än.</p>
-            {% endif %}
-        </div>
+<h3>All-time High-Score</h3>
+{% if alltime_highscore %}
+<ol>
+{% for username, high in alltime_highscore %}
+    <li>{{ username }} — {{ high }} poäng</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade än.</p>
+{% endif %}
 
-        <!-- All-time Total -->
-        <div class="tab-pane fade" id="alltime-total">
-            {% if alltime_total %}
-            <ol>
-                {% for username, total in alltime_total %}
-                    <li>{{ username }} — {{ total }} poäng</li>
-                {% endfor %}
-            </ol>
-            {% else %}
-            <p>Inga poäng registrerade än.</p>
-            {% endif %}
-        </div>
-
-        <!-- All-time Highscore -->
-        <div class="tab-pane fade" id="alltime-highscore">
-            {% if alltime_highscore %}
-            <ol>
-                {% for username, high in alltime_highscore %}
-                    <li>{{ username }} — {{ high }} poäng</li>
-                {% endfor %}
-            </ol>
-            {% else %}
-            <p>Inga poäng registrerade än.</p>
-            {% endif %}
-        </div>
-    </div>
-
-    {% else %}
-    <!-- Legacy Stacked Leaderboard -->
-    <h2>Leaderboard</h2>
-
-    <h3>Dagliga Total-Score</h3>
-    {% if today_total %}
-    <ol>
-        {% for username, total in today_total %}
-            <li>{{ username }} — {{ total }} poäng</li>
-        {% endfor %}
-    </ol>
-    {% else %}
-    <p>Inga poäng registrerade idag än.</p>
-    {% endif %}
-
-    <h3>Dagliga High-Score</h3>
-    {% if today_highscore %}
-    <ol>
-        {% for username, high in today_highscore %}
-            <li>{{ username }} — {{ high }} poäng</li>
-        {% endfor %}
-    </ol>
-    {% else %}
-    <p>Inga poäng registrerade idag än.</p>
-    {% endif %}
-
-    <h3>All-time Total-Score</h3>
-    {% if alltime_total %}
-    <ol>
-        {% for username, total in alltime_total %}
-            <li>{{ username }} — {{ total }} poäng</li>
-        {% endfor %}
-    </ol>
-    {% else %}
-    <p>Inga poäng registrerade än.</p>
-    {% endif %}
-
-    <h3>All-time High-Score</h3>
-    {% if alltime_highscore %}
-    <ol>
-        {% for username, high in alltime_highscore %}
-            <li>{{ username }} — {{ high }} poäng</li>
-        {% endfor %}
-    </ol>
-    {% else %}
-    <p>Inga poäng registrerade än.</p>
-    {% endif %}
-    {% endif %}
-
-    <!-- Admin Close Day Button -->
-    {% if user.username == ADMIN_USERNAME %}
-    <form action="{{ url_for('close_day') }}" method="post" class="mt-3">
-        <button type="submit" class="btn btn-danger">
-            Close Day & Distribute Rewards
-        </button>
-    </form>
-    {% endif %}
-
-    <p class="mt-3">
-        Notera: Dagens högsta poängvinnare får alla poäng som Viggo coins! Totalpoäng delas proportionellt på 1000 coins.
-    </p>
-</div>
-
-{% endblock %}
+<p>Notera: Dagens högsta poängvinnare får alla poäng som Viggo coins! Totalpoäng delas proportionellt på 1000 coins.</p>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -260,38 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keydown', e => {
-    if (!running) return;
-    switch(e.key) {
-        // Up
-        case "ArrowUp":
-        case "w":
-        case "W":
-            if (velocity.y !== 1) velocity = {x: 0, y: -1};
-            break;
-
-        // Down
-        case "ArrowDown":
-        case "s":
-        case "S":
-            if (velocity.y !== -1) velocity = {x: 0, y: 1};
-            break;
-
-        // Left
-        case "ArrowLeft":
-        case "a":
-        case "A":
-            if (velocity.x !== 1) velocity = {x: -1, y: 0};
-            break;
-
-        // Right
-        case "ArrowRight":
-        case "d":
-        case "D":
-            if (velocity.x !== -1) velocity = {x: 1, y: 0};
-            break;
-    }
-});
-
+        if (!running) return;
+        switch(e.key) {
+            case "ArrowUp": if (velocity.y!==1) velocity={x:0,y:-1}; break;
+            case "ArrowDown": if (velocity.y!==-1) velocity={x:0,y:1}; break;
+            case "ArrowLeft": if (velocity.x!==1) velocity={x:-1,y:0}; break;
+            case "ArrowRight": if (velocity.x!==-1) velocity={x:1,y:0}; break;
+        }
+    });
 
     draw();
 });

@@ -1,127 +1,187 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Flappy Bird</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: #70c5ce;
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Flappy Bird - Spela och tjäna coins!</h1>
+
+<p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
+
+<canvas id="gameCanvas" width="320" height="480" style="border:1px solid #000;"></canvas>
+
+<p>Poäng: <span id="score">0</span></p>
+<p>Senaste spel: <span id="recentScore">-</span></p>
+<p>Högsta poäng (all-time): <span id="highScore">0</span></p>
+
+<button id="startBtn">Starta spelet</button>
+<p id="gameMessage" style="color: red; font-weight: bold; margin-top: 10px;"></p>
+
+<h2>Leaderboard - High Score</h2>
+{% if highscore_list %}
+<ol>
+{% for username, high in highscore_list %}
+    <li>{{ username }} — {{ high }} coins</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>Inga poäng registrerade än.</p>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const bird = { x: 60, y: 240, w: 34, h: 24, gravity: 0.5, lift: -10, velocity: 0 };
+    const pipes = [];
+    const pipeGap = 120;
+    const pipeSpeed = 2;
+    const groundHeight = 80;
+    let frame = 0;
+    let score = 0;
+    let running = false;
+    let gameInterval;
+
+    let highScore = {{ user_highscore }};
+    const scoreElem = document.getElementById('score');
+    const recentScoreElem = document.getElementById('recentScore');
+    const highScoreElem = document.getElementById('highScore');
+    const startBtn = document.getElementById('startBtn');
+    const gameMessage = document.getElementById('gameMessage');
+
+    highScoreElem.innerText = highScore;
+
+    function drawBackground() {
+        ctx.fillStyle = "#70c5ce";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawGround() {
+        ctx.fillStyle = "#ded895";
+        ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+    }
+
+    function drawBird() {
+        ctx.fillStyle = "yellow";
+        ctx.fillRect(bird.x, bird.y, bird.w, bird.h);
+        ctx.fillStyle = "orange";
+        ctx.fillRect(bird.x + bird.w - 6, bird.y + bird.h/2 - 4, 6, 4);
+    }
+
+    function drawPipes() {
+        ctx.fillStyle = "#4caf50";
+        pipes.forEach(p => {
+            ctx.fillRect(p.x, 0, p.w, p.top);
+            ctx.fillRect(p.x, canvas.height - groundHeight - p.bottom, p.w, p.bottom);
+        });
+    }
+
+    function resetGame() {
+        bird.y = 240;
+        bird.velocity = 0;
+        pipes.length = 0;
+        score = 0;
+        frame = 0;
+        running = false;
+        scoreElem.innerText = score;
+        gameMessage.innerText = '';
+        clearInterval(gameInterval);
+        drawStartMenu();
+    }
+
+    function drawStartMenu() {
+        drawBackground();
+        drawGround();
+        drawBird();
+        ctx.fillStyle = "white";
+        ctx.font = "24px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Flappy Bird", canvas.width / 2, canvas.height / 2 - 50);
+        ctx.fillText("Tryck på SPACE för att starta", canvas.width / 2, canvas.height / 2);
+    }
+
+    function updateBird() {
+        bird.velocity += bird.gravity;
+        bird.velocity *= 0.9;
+        bird.y += bird.velocity;
+        if (bird.y + bird.h > canvas.height - groundHeight) gameOver();
+        if (bird.y < 0) bird.y = 0;
+    }
+
+    function updatePipes() {
+        if (frame % 90 === 0) {
+            const top = Math.random() * (canvas.height - groundHeight - pipeGap - 50) + 20;
+            pipes.push({ x: canvas.width, w: 50, top: top, bottom: canvas.height - groundHeight - top - pipeGap, passed: false });
         }
-        canvas {
-            background: #70c5ce;
-            display: block;
-        }
-        #score {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 24px;
-            font-family: Arial, sans-serif;
-            color: white;
-        }
-    </style>
-</head>
-<body>
-    <div id="score">Score: 0</div>
-    <canvas id="gameCanvas" width="320" height="480"></canvas>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
-        const scoreEl = document.getElementById("score");
+        pipes.forEach(p => {
+            p.x -= pipeSpeed;
 
-        // Bird
-        let bird = { x: 50, y: 150, w: 20, h: 20, gravity: 0.6, lift: -10, velocity: 0 };
-
-        // Pipes
-        let pipes = [];
-        let frame = 0;
-        let score = 0;
-
-        function drawBird() {
-            ctx.fillStyle = "yellow";
-            ctx.fillRect(bird.x, bird.y, bird.w, bird.h);
-        }
-
-        function updateBird() {
-            bird.velocity += bird.gravity;
-            bird.y += bird.velocity;
-
-            if (bird.y + bird.h > canvas.height) {
-                resetGame();
+            // Collision
+            if (
+                bird.x < p.x + p.w &&
+                bird.x + bird.w > p.x &&
+                (bird.y < p.top || bird.y + bird.h > canvas.height - groundHeight - p.bottom)
+            ) {
+                gameOver();
             }
-            if (bird.y < 0) bird.y = 0;
-        }
 
-        function drawPipes() {
-            ctx.fillStyle = "green";
-            pipes.forEach(p => {
-                ctx.fillRect(p.x, 0, p.w, p.top);
-                ctx.fillRect(p.x, canvas.height - p.bottom, p.w, p.bottom);
-            });
-        }
-
-        function updatePipes() {
-            if (frame % 90 === 0) {
-                let top = Math.random() * (canvas.height / 2);
-                let gap = 140;
-                pipes.push({ x: canvas.width, w: 40, top: top, bottom: canvas.height - top - gap });
+            // Score
+            if (!p.passed && bird.x > p.x + p.w) {
+                score++;
+                p.passed = true;
+                scoreElem.innerText = score;
             }
-            pipes.forEach(p => {
-                p.x -= 2;
-
-                // Collision
-                if (
-                    bird.x < p.x + p.w &&
-                    bird.x + bird.w > p.x &&
-                    (bird.y < p.top || bird.y + bird.h > canvas.height - p.bottom)
-                ) {
-                    resetGame();
-                }
-
-                // Score
-                if (p.x + p.w === bird.x) {
-                    score++;
-                    scoreEl.textContent = "Score: " + score;
-                }
-            });
-
-            // Remove off-screen pipes
-            pipes = pipes.filter(p => p.x + p.w > 0);
-        }
-
-        function resetGame() {
-            bird.y = 150;
-            bird.velocity = 0;
-            pipes = [];
-            score = 0;
-            scoreEl.textContent = "Score: 0";
-        }
-
-        function loop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            drawBird();
-            drawPipes();
-
-            updateBird();
-            updatePipes();
-
-            frame++;
-            requestAnimationFrame(loop);
-        }
-
-        document.addEventListener("keydown", () => {
-            bird.velocity = bird.lift;
         });
 
-        loop();
-    </script>
-</body>
-</html>
+        while (pipes.length && pipes[0].x + pipes[0].w < 0) pipes.shift();
+    }
+
+    function gameLoop() {
+        if (!running) return;
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground();
+        drawPipes();
+        drawGround();
+        drawBird();
+        updateBird();
+        updatePipes();
+    }
+
+    function gameOver() {
+        clearInterval(gameInterval);
+        running = false;
+        gameMessage.innerText = "Game Over! Klicka på 'Starta spelet' för att spela igen.";
+        recentScoreElem.innerText = score;
+
+        if (score > highScore) {
+            highScore = score;
+            highScoreElem.innerText = highScore;
+        }
+
+        // Send score to server (1 score = 1 coin)
+        fetch("{{ url_for('flappy_submit') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({score: score})
+        }).catch(() => console.error('Fel vid sparande av poängen.'));
+    }
+
+    startBtn.addEventListener('click', () => {
+        if (running) return;
+        resetGame();
+        running = true;
+        bird.velocity = 0;
+        gameInterval = setInterval(gameLoop, 20);
+    });
+
+    window.addEventListener('keydown', e => {
+        if (e.code === "Space") {
+            if (!running) startBtn.click();
+            else bird.velocity = bird.lift;
+        }
+    });
+
+    drawStartMenu();
+});
+</script>
+{% endblock %}
