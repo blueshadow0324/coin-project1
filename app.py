@@ -652,13 +652,13 @@ def add_ui_mode_column():
 
     # Check if column exists first
     try:
-        db.session.execute("SELECT ui_mode FROM user LIMIT 1")
-        return "Column 'ui_mode' already exists!"
+        db.session.execute(text('SELECT ui_mode FROM "user" LIMIT 1'))
+        return 'Column "ui_mode" already exists!'
     except:
-        # Add column manually
-        db.session.execute(text("ALTER TABLE user ADD COLUMN ui_mode TEXT DEFAULT 'legacy'"))
+        # Add column manually with double quotes
+        db.session.execute(text('ALTER TABLE "user" ADD COLUMN ui_mode TEXT DEFAULT \'legacy\''))
         db.session.commit()
-        return "Column 'ui_mode' added to user table!"
+        return 'Column "ui_mode" added to user table!'
 
 
 
