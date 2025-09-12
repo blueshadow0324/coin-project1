@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Tärning - Satsa och gissa</h1>
+
+<p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
+
+{% if result %}
+    <p><strong>{{ result }}</strong></p>
+{% endif %}
+
+<form method="post" action="{{ url_for('dice') }}">
+    <label for="guess">Gissa ett nummer (1-6):</label>
+    <input type="number" id="guess" name="guess" min="1" max="6" value="{{ guess if guess else '' }}" required>
+
+    <label for="bet">Satsa antal coins:</label>
+    <input type="number" id="bet" name="bet" min="1" max="{{ user.coins }}" value="{{ bet if bet else '' }}" required>
+
+    <button type="submit">Kasta Tärning</button>
+</form>
+{% endblock %}
