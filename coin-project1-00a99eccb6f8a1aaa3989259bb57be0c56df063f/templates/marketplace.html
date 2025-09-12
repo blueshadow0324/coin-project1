@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Marketplace</h2>
+<a href="{{ url_for('add_item') }}" class="btn btn-primary mb-3">+ Lägg till objekt</a>
+
+{% for item in items %}
+<div class="card mb-3">
+    <div class="card-body">
+        {% if item.image_filename %}
+            <img src="{{ url_for('static', filename='uploads/' ~ item.image_filename) }}"
+                 class="img-thumbnail" style="max-height:150px;">
+        {% endif %}
+        <h5 class="card-title">{{ item.title }}</h5>
+        <p class="card-text">{{ item.description }}</p>
+        <p><strong>Pris:</strong> {{ item.price }} coins</p>
+        <p><strong>Säljare:</strong> {{ item.seller.username }}</p>
+
+        {% if item.seller_id == user.id %}
+            <small>Du är säljaren</small><br>
+            {% if not item.buyer_id %}
+                <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" style="display:inline;">
+                    <button class="btn btn-danger btn-sm" type="submit">Ta bort</button>
+                </form>
+            {% else %}
+                <small class="text-muted">Objektet är sålt och kan inte tas bort</small>
+            {% endif %}
+        {% elif not item.buyer_id %}
+            <form method="post" action="{{ url_for('buy_item', item_id=item.id) }}" style="display:inline;">
+                <button class="btn btn-success" type="submit">Köp</button>
+            </form>
+        {% else %}
+            <small class="text-muted">Såld</small>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<p>Inga objekt tillgängliga just nu.</p>
+{% endfor %}
+{% endblock %}
