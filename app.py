@@ -35,7 +35,7 @@ class User(db.Model):
     received_transactions = db.relationship('Transaction', foreign_keys='Transaction.receiver_id', backref='receiver', lazy=True)
     messages = db.relationship('Message', backref='user', lazy=True)
     snake_scores = db.relationship('SnakeScore', backref='user', lazy=True)
-    ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
+    #ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
