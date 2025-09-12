@@ -35,6 +35,7 @@ class User(db.Model):
     received_transactions = db.relationship('Transaction', foreign_keys='Transaction.receiver_id', backref='receiver', lazy=True)
     messages = db.relationship('Message', backref='user', lazy=True)
     snake_scores = db.relationship('SnakeScore', backref='user', lazy=True)
+    ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -320,8 +321,9 @@ def snake():
         alltime_highscore=alltime_highscore,
         user=g.user,
         user_highscore=user_highscore,
-        selected_date=selected_date,  # <-- Pass date to template
-        ADMIN_USERNAME=ADMIN_USERNAME
+        selected_date=selected_date,
+        ADMIN_USERNAME=ADMIN_USERNAME,
+        ui_mode = g.user.ui_mode
     )
 
 
@@ -573,6 +575,12 @@ from flask import abort, g
 from datetime import date, timedelta
 from sqlalchemy import func
 
+@app.route("/flappy")
+@login_required
+def flappy():
+    return render_template("flappy.html", user=g.user)
+
+
 @app.route('/admin/close-day', methods=['POST'])
 @login_required
 def close_day():
@@ -626,7 +634,29 @@ def close_day():
     flash(f"Day {today} closed, rewards distributed and leaderboard reset!", "success")
     return redirect(url_for("snake"))
 
+@app.route("/toggle-ui")
+@login_required
+def toggle_ui():
+    g.user.ui_mode = "modern" if g.user.ui_mode == "legacy" else "legacy"
+    db.session.commit()
+    flash(f"Switched to {g.user.ui_mode} mode!", "success")
+    return redirect(url_for("snake"))
 
+@app.route("/admin/add-ui-mode-column")
+@login_required
+def add_ui_mode_column():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    # Check if column exists first
+    try:
+        db.session.execute("SELECT ui_mode FROM user LIMIT 1")
+        return "Column 'ui_mode' already exists!"
+    except:
+        # Add column manually
+        db.session.execute("ALTER TABLE user ADD COLUMN ui_mode TEXT DEFAULT 'legacy'")
+        db.session.commit()
+        return "Column 'ui_mode' added to user table!"
 
 
 
