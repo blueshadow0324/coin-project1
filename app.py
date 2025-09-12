@@ -642,6 +642,8 @@ def toggle_ui():
     flash(f"Switched to {g.user.ui_mode} mode!", "success")
     return redirect(url_for("snake"))
 
+from sqlalchemy import text
+
 @app.route("/admin/add-ui-mode-column")
 @login_required
 def add_ui_mode_column():
@@ -654,7 +656,7 @@ def add_ui_mode_column():
         return "Column 'ui_mode' already exists!"
     except:
         # Add column manually
-        db.session.execute("ALTER TABLE user ADD COLUMN ui_mode TEXT DEFAULT 'legacy'")
+        db.session.execute(text("ALTER TABLE user ADD COLUMN ui_mode TEXT DEFAULT 'legacy'"))
         db.session.commit()
         return "Column 'ui_mode' added to user table!"
 
