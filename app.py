@@ -323,7 +323,7 @@ def snake():
         user_highscore=user_highscore,
         selected_date=selected_date,
         ADMIN_USERNAME=ADMIN_USERNAME,
-        ui_mode = g.user.ui_mode
+        #ui_mode = g.user.ui_mode
     )
 
 
