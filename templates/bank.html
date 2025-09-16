@@ -108,7 +108,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const ctx = document.getElementById('bankChart').getContext('2d');
-const labels = {{ transactions|map(attribute='timestamp')|map('strftime', '%Y-%m-%d')|list }};
+<td>{{ t.timestamp|datetimeformat }}</td>
 const balanceData = {{ transactions|map(attribute='balance')|list }};
 const loanData = {{ transactions|map(attribute='loan')|list }};
 
