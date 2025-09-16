@@ -631,22 +631,55 @@ def flappy_submit():
     return jsonify({"message": "Score saved", "score": score, "coins": g.user.coins})
 
 
+from datetime import date, datetime
+
 class BankAccount(db.Model):
+    __tablename__ = "bank_account"
+    __table_args__ = {"extend_existing": True}
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
-    balance = db.Column(db.Integer, default=0)       # Savings
-    loan = db.Column(db.Integer, default=0)          # Outstanding loan
-    credit_score = db.Column(db.Integer, default=500)  # 300–850 typical range
+    balance = db.Column(db.Integer, default=0)
+    loan = db.Column(db.Integer, default=0)
+    credit_score = db.Column(db.Integer, default=500)
     last_interest_date = db.Column(db.Date, default=date.today)
 
-    user = db.relationship("User", backref=backref("bank_account", uselist=False))
+    loans_taken = db.Column(db.Integer, default=0)
+    loans_repaid_on_time = db.Column(db.Integer, default=0)
+    loans_missed = db.Column(db.Integer, default=0)
+
+    user = db.relationship("User", backref=db.backref("bank_account", uselist=False))
+    transactions = db.relationship("BankTransaction", backref="account", lazy=True)
 
     def calculate_credit_score(self):
         score = 500
+        # Savings effect
         score += min(self.balance // 100, 200)
+        # Outstanding loan effect
         score -= min(self.loan // 100, 200)
+        # Repayment history
+        if self.loans_taken > 0:
+            on_time_ratio = self.loans_repaid_on_time / self.loans_taken
+            missed_ratio = self.loans_missed / self.loans_taken
+            score += int(on_time_ratio * 100)
+            score -= int(missed_ratio * 150)
+        # Account age effect
+        try:
+            age_days = (date.today() - self.user.created_at.date()).days
+            score += min(age_days // 30, 50)
+        except Exception:
+            pass
         self.credit_score = max(300, min(850, score))
 
+class BankTransaction(db.Model):
+    __tablename__ = "bank_transaction"
+
+    id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey("bank_account.id"), nullable=False)
+    type = db.Column(db.String(20))  # "deposit", "withdraw", "loan", "repay"
+    amount = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    note = db.Column(db.String(255), nullable=True)
 
 
 def apply_interest(account):
@@ -654,16 +687,22 @@ def apply_interest(account):
     if account.last_interest_date < today:
         days_passed = (today - account.last_interest_date).days
 
-        # Interest rates
-        balance_rate = 0.01   # 1% daily on savings
-        loan_rate = 0.02      # 2% daily on loans
+        # Base interest rates
+        balance_rate = 0.05  # 5% daily on savings
+        loan_rate = 0.1     # 10% daily on loans
 
-        # Apply savings interest
+        # Penalize low credit score
+        if account.credit_score < 500:
+            loan_rate += 0.05  # +5% if score is low
+        if account.credit_score < 300:
+            loan_rate += 0.1  # +10% more if really low
+        if account.credit_score < 200:
+            loan_rate += 0.1  # +10% more if even more low
+
+        # Apply interest
         if account.balance > 0:
             gained = int(account.balance * balance_rate * days_passed)
             account.balance += gained
-
-        # Apply loan interest
         if account.loan > 0:
             added = int(account.loan * loan_rate * days_passed)
             account.loan += added
@@ -672,80 +711,53 @@ def apply_interest(account):
         account.calculate_credit_score()
         db.session.commit()
 
+
 @app.route('/bank', methods=['GET', 'POST'])
 @login_required
 def bank():
-    # Ensure user has an account
     account = g.user.bank_account
     if not account:
-        account = BankAccount(user_id=g.user.id, balance=0, loan=0)
+        account = BankAccount(user_id=g.user.id)
         db.session.add(account)
         db.session.commit()
 
-    # Apply daily interest + update credit score
     apply_interest(account)
 
     if request.method == 'POST':
         action = request.form.get("action")
-        amount_str = request.form.get("amount", "").strip()
+        amount = int(request.form.get("amount", 0))
 
-        if not amount_str.isdigit():
-            flash("Ange ett giltigt belopp.", "danger")
-            return redirect(url_for("bank"))
-
-        amount = int(amount_str)
-        if amount <= 0:
-            flash("Beloppet måste vara större än 0.", "danger")
-            return redirect(url_for("bank"))
-
-        # Deposit
-        if action == "deposit":
-            if g.user.coins < amount:
-                flash("Du har inte tillräckligt med coins.", "danger")
-            else:
-                g.user.coins -= amount
-                account.balance += amount
-                flash(f"Du satte in {amount} coins.", "success")
-
-        # Withdraw
-        elif action == "withdraw":
-            if account.balance < amount:
-                flash("Du har inte tillräckligt i banken.", "danger")
-            else:
-                account.balance -= amount
-                g.user.coins += amount
-                flash(f"Du tog ut {amount} coins.", "success")
-
-        # Loan
+        if action == "deposit" and g.user.coins >= amount:
+            g.user.coins -= amount
+            account.balance += amount
+            db.session.add(BankTransaction(account_id=account.id, type="deposit", amount=amount))
+        elif action == "withdraw" and account.balance >= amount:
+            account.balance -= amount
+            g.user.coins += amount
+            db.session.add(BankTransaction(account_id=account.id, type="withdraw", amount=amount))
         elif action == "loan":
-            max_loan = account.credit_score * 2  # Higher score → higher max loan
-            if account.loan > 0:
-                flash("Betala av ditt nuvarande lån först.", "danger")
-            elif amount > max_loan:
-                flash(f"Din kreditgräns tillåter max {max_loan} coins.", "danger")
-            else:
+            max_loan = account.credit_score * 2
+            if amount <= max_loan and account.loan == 0:
                 account.loan += amount
+                account.loans_taken += 1
                 g.user.coins += amount
-                flash(f"Du tog ett lån på {amount} coins.", "success")
+                db.session.add(BankTransaction(account_id=account.id, type="loan", amount=amount))
+        elif action == "repay" and account.loan > 0 and g.user.coins >= amount:
+            repay_amount = min(amount, account.loan)
+            account.loan -= repay_amount
+            g.user.coins -= repay_amount
+            account.loans_repaid_on_time += 1
+            db.session.add(BankTransaction(account_id=account.id, type="repay", amount=repay_amount))
 
-        # Repay
-        elif action == "repay":
-            if account.loan == 0:
-                flash("Du har inget lån.", "info")
-            elif g.user.coins < amount:
-                flash("Inte tillräckligt med coins.", "danger")
-            else:
-                repay_amount = min(amount, account.loan)
-                g.user.coins -= repay_amount
-                account.loan -= repay_amount
-                flash(f"Du betalade av {repay_amount} coins.", "success")
-
-        # Recalculate score & commit
         account.calculate_credit_score()
         db.session.commit()
         return redirect(url_for("bank"))
 
-    return render_template("bank.html", user=g.user, account=account)
+    # Load last 50 transactions for the table
+    transactions = BankTransaction.query.filter_by(account_id=account.id).order_by(BankTransaction.timestamp.desc()).limit(50).all()
+
+    return render_template("bank.html", user=g.user, account=account, transactions=transactions)
+
 
 @app.route('/admin/close-day', methods=['POST'])
 @login_required
