@@ -633,6 +633,87 @@ def flappy_submit():
 
 
 @app.route('/admin/close-day', methods=['POST'])
+class BankAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
+    balance = db.Column(db.Integer, default=0)   # Savings inside the bank
+    loan = db.Column(db.Integer, default=0)      # Active loan amount
+    user = db.relationship("User", backref=db.backref("bank_account", uselist=False))
+
+@app.route('/bank', methods=['GET', 'POST'])
+@login_required
+def bank():
+    # Ensure the user has a bank account
+    account = g.user.bank_account
+    if not account:
+        account = BankAccount(user_id=g.user.id, balance=0, loan=0)
+        db.session.add(account)
+        db.session.commit()
+
+    if request.method == 'POST':
+        action = request.form.get("action")
+        amount_str = request.form.get("amount", "").strip()
+
+        if not amount_str.isdigit():
+            flash("Ange ett giltigt belopp.", "danger")
+            return redirect(url_for("bank"))
+
+        amount = int(amount_str)
+        if amount <= 0:
+            flash("Beloppet måste vara större än 0.", "danger")
+            return redirect(url_for("bank"))
+
+        # --- Deposit ---
+        if action == "deposit":
+            if g.user.coins < amount:
+                flash("Du har inte tillräckligt med coins för att sätta in.", "danger")
+            else:
+                g.user.coins -= amount
+                account.balance += amount
+                db.session.commit()
+                flash(f"Du satte in {amount} coins i banken.", "success")
+
+        # --- Withdraw ---
+        elif action == "withdraw":
+            if account.balance < amount:
+                flash("Du har inte tillräckligt i banken.", "danger")
+            else:
+                account.balance -= amount
+                g.user.coins += amount
+                db.session.commit()
+                flash(f"Du tog ut {amount} coins från banken.", "success")
+
+        # --- Loan ---
+        elif action == "loan":
+            max_loan = 1000  # you can tweak this limit
+            if account.loan > 0:
+                flash("Du måste betala av ditt nuvarande lån innan du kan ta ett nytt.", "danger")
+            elif amount > max_loan:
+                flash(f"Du kan inte låna mer än {max_loan} coins.", "danger")
+            else:
+                account.loan += amount
+                g.user.coins += amount
+                db.session.commit()
+                flash(f"Du tog ett lån på {amount} coins.", "success")
+
+        # --- Repay Loan ---
+        elif action == "repay":
+            if account.loan == 0:
+                flash("Du har inget lån att betala av.", "info")
+            elif g.user.coins < amount:
+                flash("Du har inte tillräckligt med coins för att betala av lånet.", "danger")
+            else:
+                repay_amount = min(amount, account.loan)
+                g.user.coins -= repay_amount
+                account.loan -= repay_amount
+                db.session.commit()
+                flash(f"Du betalade av {repay_amount} coins på ditt lån.", "success")
+
+        return redirect(url_for("bank"))
+
+    return render_template("bank.html", user=g.user, account=account)
+
+
 @login_required
 def close_day():
     if g.user.username != ADMIN_USERNAME:
