@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from sqlalchemy.orm import backref
+import subprocess
 
 # Flask app
 app = Flask(__name__)
@@ -901,6 +902,13 @@ def download_db_backup():
     # Return file for download
     return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
 
+from datetime import datetime
+
+@app.template_filter('datetimeformat')
+def datetimeformat(value, format="%Y-%m-%d %H:%M"):
+    if value is None:
+        return "-"
+    return value.strftime(format)
 
  # --- Run app ---
 if __name__ == '__main__':

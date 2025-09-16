@@ -89,15 +89,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for t in transactions %}
-                    <tr>
-                        <td>{{ t.timestamp.strftime("%Y-%m-%d %H:%M") }}</td>
-                        <td>{{ t.type }}</td>
-                        <td>{{ t.amount }}</td>
-                        <td>{{ t.note or "-" }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+  {% for t in transactions %}
+  <tr>
+    <td>{{ t.timestamp|datetimeformat }}</td>
+    <td>{{ t.type }}</td>
+    <td>{{ t.amount }}</td>
+    <td>{{ t.note or "-" }}</td>
+  </tr>
+  {% endfor %}
+</tbody>
+
             </table>
         </div>
     </div>
