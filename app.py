@@ -19,6 +19,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+@app.template_filter('datetimeformat')
+def datetimeformat(value, format="%Y-%m-%d %H:%M"):
+    if value is None:
+        return "-"
+    return value.strftime(format)
+
+ # --- Run app ---
+
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -902,14 +910,6 @@ def download_db_backup():
     # Return file for download
     return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
 
-from datetime import datetime
 
-@app.template_filter('datetimeformat')
-def datetimeformat(value, format="%Y-%m-%d %H:%M"):
-    if value is None:
-        return "-"
-    return value.strftime(format)
-
- # --- Run app ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
