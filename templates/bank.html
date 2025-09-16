@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Bank</h2>
+    <p><strong>Dina coins:</strong> {{ user.coins }}</p>
+    <p><strong>Saldo i banken:</strong> {{ account.balance }}</p>
+    <p><strong>Lån:</strong> {{ account.loan }}</p>
+
+    <form method="post" class="mb-3">
+        <input type="number" name="amount" placeholder="Belopp" class="form-control mb-2" required>
+        <button type="submit" name="action" value="deposit" class="btn btn-primary">Sätt in</button>
+        <button type="submit" name="action" value="withdraw" class="btn btn-warning">Ta ut</button>
+        <button type="submit" name="action" value="loan" class="btn btn-success">Ta lån</button>
+        <button type="submit" name="action" value="repay" class="btn btn-danger">Betala av lån</button>
+    </form>
+</div>
+{% endblock %}
