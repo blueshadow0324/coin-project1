@@ -801,9 +801,38 @@ def bank():
         db.session.commit()
         return redirect(url_for("bank"))
 
-    # Load last 50 transactions
-    transactions = BankTransaction.query.filter_by(account_id=account.id).order_by(BankTransaction.timestamp.desc()).limit(50).all()
-    return render_template("bank.html", user=g.user, account=account, transactions=transactions)
+        # Load last 50 transactions
+        transactions = BankTransaction.query.filter_by(account_id=account.id).order_by(
+            BankTransaction.timestamp.desc()
+        ).limit(50).all()
+
+        # Prepare chart data: daily balance and loan snapshots
+        history = BankTransaction.query.filter_by(account_id=account.id).order_by(BankTransaction.timestamp.asc()).all()
+        chart_data = []
+        balance = 0
+        loan = 0
+        for t in history:
+            if t.type == "deposit":
+                balance += t.amount
+            elif t.type == "withdraw":
+                balance -= t.amount
+            elif t.type == "loan":
+                loan += t.amount
+            elif t.type == "repay":
+                loan -= t.amount
+            chart_data.append({
+                "timestamp": t.timestamp.strftime("%Y-%m-%d"),
+                "balance": balance,
+                "loan": loan
+            })
+
+        return render_template(
+            "bank.html",
+            user=g.user,
+            account=account,
+            transactions=transactions,
+            chart_data=json.dumps(chart_data)  # pass as JSON
+        )
 
 
 @app.route('/admin/close-day', methods=['POST'])
@@ -867,14 +896,11 @@ def toggle_ui():
     flash(f"Switched to {g.user.ui_mode} mode!", "success")
     return redirect(url_for("snake"))
 
-from flask import g
-from sqlalchemy import text
 from datetime import date
 
 from sqlalchemy import inspect
 from flask import jsonify
 
-from sqlalchemy import text
 from flask import jsonify
 
 from flask import Flask, g, redirect, url_for, flash

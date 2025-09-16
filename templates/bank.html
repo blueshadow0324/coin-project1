@@ -89,4 +89,76 @@
         </tbody>
     </table>
 </div>
+
+<div class="card mt-4 shadow-lg">
+    <div class="card-body">
+        <h5 class="card-title text-center">📈 Bank Balance & Loan History</h5>
+        <canvas id="bankChart" width="400" height="200"></canvas>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const chartData = {{ chart_data|safe }};
+
+const labels = chartData.map(item => item.timestamp);
+const balances = chartData.map(item => item.balance);
+const loans = chartData.map(item => item.loan);
+
+const ctx = document.getElementById('bankChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Balance',
+                data: balances,
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                tension: 0.3
+            },
+            {
+                label: 'Loan',
+                data: loans,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                tension: 0.3
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        interaction: {
+            mode: 'index',
+            intersect: false,
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+        },
+        scales: {
+            x: {
+                display: true,
+                title: {
+                    display: true,
+                    text: 'Date'
+                }
+            },
+            y: {
+                display: true,
+                title: {
+                    display: true,
+                    text: 'Coins'
+                },
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+
 {% endblock %}
