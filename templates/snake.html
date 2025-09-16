@@ -172,15 +172,15 @@ document.addEventListener('DOMContentLoaded', () => {
         gameInterval = setInterval(gameLoop, 120);
     });
 
-    window.addEventListener('keydown', e => {
-        if (!running) return;
-        switch(e.key) {
-            case "ArrowUp": if (velocity.y!==1) velocity={x:0,y:-1}; break;
-            case "ArrowDown": if (velocity.y!==-1) velocity={x:0,y:1}; break;
-            case "ArrowLeft": if (velocity.x!==1) velocity={x:-1,y:0}; break;
-            case "ArrowRight": if (velocity.x!==-1) velocity={x:1,y:0}; break;
-        }
-    });
+  window.addEventListener('keydown', e => {
+    if (!running) return;
+    switch(e.key.toLowerCase()) {  // ensure lowercase for consistency
+        case "w": if (velocity.y !== 1) velocity = {x: 0, y: -1}; break;
+        case "s": if (velocity.y !== -1) velocity = {x: 0, y: 1}; break;
+        case "a": if (velocity.x !== 1) velocity = {x: -1, y: 0}; break;
+        case "d": if (velocity.x !== -1) velocity = {x: 1, y: 0}; break;
+    }
+});
 
     draw();
 });

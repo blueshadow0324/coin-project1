@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
+from sqlalchemy.orm import backref
 
 # Flask app
 app = Flask(__name__)
@@ -630,25 +631,59 @@ def flappy_submit():
     return jsonify({"message": "Score saved", "score": score, "coins": g.user.coins})
 
 
-
-
-@app.route('/admin/close-day', methods=['POST'])
 class BankAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
-    balance = db.Column(db.Integer, default=0)   # Savings inside the bank
-    loan = db.Column(db.Integer, default=0)      # Active loan amount
-    user = db.relationship("User", backref=db.backref("bank_account", uselist=False))
+    balance = db.Column(db.Integer, default=0)       # Savings
+    loan = db.Column(db.Integer, default=0)          # Outstanding loan
+    credit_score = db.Column(db.Integer, default=500)  # 300–850 typical range
+    last_interest_date = db.Column(db.Date, default=date.today)
+
+    user = db.relationship("User", backref=backref("bank_account", uselist=False))
+
+    def calculate_credit_score(self):
+        score = 500
+        score += min(self.balance // 100, 200)
+        score -= min(self.loan // 100, 200)
+        self.credit_score = max(300, min(850, score))
+
+
+
+def apply_interest(account):
+    today = date.today()
+    if account.last_interest_date < today:
+        days_passed = (today - account.last_interest_date).days
+
+        # Interest rates
+        balance_rate = 0.01   # 1% daily on savings
+        loan_rate = 0.02      # 2% daily on loans
+
+        # Apply savings interest
+        if account.balance > 0:
+            gained = int(account.balance * balance_rate * days_passed)
+            account.balance += gained
+
+        # Apply loan interest
+        if account.loan > 0:
+            added = int(account.loan * loan_rate * days_passed)
+            account.loan += added
+
+        account.last_interest_date = today
+        account.calculate_credit_score()
+        db.session.commit()
 
 @app.route('/bank', methods=['GET', 'POST'])
 @login_required
 def bank():
-    # Ensure the user has a bank account
+    # Ensure user has an account
     account = g.user.bank_account
     if not account:
         account = BankAccount(user_id=g.user.id, balance=0, loan=0)
         db.session.add(account)
         db.session.commit()
+
+    # Apply daily interest + update credit score
+    apply_interest(account)
 
     if request.method == 'POST':
         action = request.form.get("action")
@@ -663,57 +698,56 @@ def bank():
             flash("Beloppet måste vara större än 0.", "danger")
             return redirect(url_for("bank"))
 
-        # --- Deposit ---
+        # Deposit
         if action == "deposit":
             if g.user.coins < amount:
-                flash("Du har inte tillräckligt med coins för att sätta in.", "danger")
+                flash("Du har inte tillräckligt med coins.", "danger")
             else:
                 g.user.coins -= amount
                 account.balance += amount
-                db.session.commit()
-                flash(f"Du satte in {amount} coins i banken.", "success")
+                flash(f"Du satte in {amount} coins.", "success")
 
-        # --- Withdraw ---
+        # Withdraw
         elif action == "withdraw":
             if account.balance < amount:
                 flash("Du har inte tillräckligt i banken.", "danger")
             else:
                 account.balance -= amount
                 g.user.coins += amount
-                db.session.commit()
-                flash(f"Du tog ut {amount} coins från banken.", "success")
+                flash(f"Du tog ut {amount} coins.", "success")
 
-        # --- Loan ---
+        # Loan
         elif action == "loan":
-            max_loan = 1000  # you can tweak this limit
+            max_loan = account.credit_score * 2  # Higher score → higher max loan
             if account.loan > 0:
-                flash("Du måste betala av ditt nuvarande lån innan du kan ta ett nytt.", "danger")
+                flash("Betala av ditt nuvarande lån först.", "danger")
             elif amount > max_loan:
-                flash(f"Du kan inte låna mer än {max_loan} coins.", "danger")
+                flash(f"Din kreditgräns tillåter max {max_loan} coins.", "danger")
             else:
                 account.loan += amount
                 g.user.coins += amount
-                db.session.commit()
                 flash(f"Du tog ett lån på {amount} coins.", "success")
 
-        # --- Repay Loan ---
+        # Repay
         elif action == "repay":
             if account.loan == 0:
-                flash("Du har inget lån att betala av.", "info")
+                flash("Du har inget lån.", "info")
             elif g.user.coins < amount:
-                flash("Du har inte tillräckligt med coins för att betala av lånet.", "danger")
+                flash("Inte tillräckligt med coins.", "danger")
             else:
                 repay_amount = min(amount, account.loan)
                 g.user.coins -= repay_amount
                 account.loan -= repay_amount
-                db.session.commit()
-                flash(f"Du betalade av {repay_amount} coins på ditt lån.", "success")
+                flash(f"Du betalade av {repay_amount} coins.", "success")
 
+        # Recalculate score & commit
+        account.calculate_credit_score()
+        db.session.commit()
         return redirect(url_for("bank"))
 
     return render_template("bank.html", user=g.user, account=account)
 
-
+@app.route('/admin/close-day', methods=['POST'])
 @login_required
 def close_day():
     if g.user.username != ADMIN_USERNAME:
@@ -774,11 +808,31 @@ def toggle_ui():
     flash(f"Switched to {g.user.ui_mode} mode!", "success")
     return redirect(url_for("snake"))
 
-@app.route("/admin/create-flappy-table")
-def create_flappy_table():
-    db.create_all()
-    return "FlappyScore table created!"
+@app.route("/admin/upgrade-bank", methods=["GET", "POST"])
+@login_required
+@admin_required   # only admin should be able to trigger this
+def upgrade_bank_table_route():
+    from sqlalchemy import text
 
+    conn = db.engine.connect()
+    messages = []
+
+    try:
+        conn.execute(text("ALTER TABLE bank_account ADD COLUMN credit_score INTEGER DEFAULT 500"))
+        messages.append("✅ Added credit_score column")
+    except Exception as e:
+        messages.append(f"⚠️ credit_score column already exists: {e}")
+
+    try:
+        conn.execute(text("ALTER TABLE bank_account ADD COLUMN last_interest_date DATE"))
+        messages.append("✅ Added last_interest_date column")
+    except Exception as e:
+        messages.append(f"⚠️ last_interest_date column already exists: {e}")
+
+    conn.close()
+    db.session.commit()
+
+    return "<br>".join(messages)
 
 
 

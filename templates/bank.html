@@ -1,18 +1,63 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="container mt-4">
-    <h2>Bank</h2>
-    <p><strong>Dina coins:</strong> {{ user.coins }}</p>
-    <p><strong>Saldo i banken:</strong> {{ account.balance }}</p>
-    <p><strong>Lån:</strong> {{ account.loan }}</p>
+    <h2 class="mb-4 text-center">🏦 Viggo Bank</h2>
 
-    <form method="post" class="mb-3">
-        <input type="number" name="amount" placeholder="Belopp" class="form-control mb-2" required>
-        <button type="submit" name="action" value="deposit" class="btn btn-primary">Sätt in</button>
-        <button type="submit" name="action" value="withdraw" class="btn btn-warning">Ta ut</button>
-        <button type="submit" name="action" value="loan" class="btn btn-success">Ta lån</button>
-        <button type="submit" name="action" value="repay" class="btn btn-danger">Betala av lån</button>
-    </form>
+    <div class="row">
+        <!-- Wallet -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-primary">
+                <div class="card-body text-center">
+                    <h5 class="card-title">💵 Plånbok</h5>
+                    <p class="display-6 text-success">{{ user.coins }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bank balance -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-success">
+                <div class="card-body text-center">
+                    <h5 class="card-title">🏦 Bankkonto</h5>
+                    <p class="display-6 text-primary">{{ account.balance }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loan -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-danger">
+                <div class="card-body text-center">
+                    <h5 class="card-title">💳 Lån</h5>
+                    <p class="display-6 text-danger">{{ account.loan }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Credit score -->
+    <div class="card mt-4 shadow-lg border-info">
+        <div class="card-body text-center">
+            <h5 class="card-title">📊 Credit Score</h5>
+            <p class="display-6 {% if account.credit_score >= 700 %}text-success{% elif account.credit_score >= 500 %}text-warning{% else %}text-danger{% endif %}">
+                {{ account.credit_score }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="card mt-4 shadow-lg">
+        <div class="card-body">
+            <form method="post" class="text-center">
+                <div class="input-group mb-3">
+                    <input type="number" name="amount" class="form-control" placeholder="Belopp" required>
+                </div>
+                <button type="submit" name="action" value="deposit" class="btn btn-primary me-2">Sätt in</button>
+                <button type="submit" name="action" value="withdraw" class="btn btn-warning me-2">Ta ut</button>
+                <button type="submit" name="action" value="loan" class="btn btn-success me-2">Ta lån</button>
+                <button type="submit" name="action" value="repay" class="btn btn-danger">Betala av</button>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
