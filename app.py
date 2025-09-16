@@ -827,34 +827,79 @@ from datetime import date
 from sqlalchemy import inspect
 from flask import jsonify
 
+from sqlalchemy import text
+from flask import jsonify
+
 @app.route('/admin/upgrade-bank-table', methods=['GET'])
 @login_required
 def upgrade_bank_table():
-    # Only allow admin users
+    # Only admin can access
     if g.user.username != "admin":
         return jsonify({"error": "Unauthorized"}), 403
 
     inspector = inspect(db.engine)
     columns = [col['name'] for col in inspector.get_columns('bank_account')]
-    queries = []
+    added_columns = []
 
     # Add missing columns
     if "loans_taken" not in columns:
-        queries.append("ALTER TABLE bank_account ADD COLUMN loans_taken INTEGER DEFAULT 0;")
+        db.session.execute(text("ALTER TABLE bank_account ADD COLUMN loans_taken INTEGER DEFAULT 0;"))
+        added_columns.append("loans_taken")
     if "loans_repaid_on_time" not in columns:
-        queries.append("ALTER TABLE bank_account ADD COLUMN loans_repaid_on_time INTEGER DEFAULT 0;")
+        db.session.execute(text("ALTER TABLE bank_account ADD COLUMN loans_repaid_on_time INTEGER DEFAULT 0;"))
+        added_columns.append("loans_repaid_on_time")
     if "loans_missed" not in columns:
-        queries.append("ALTER TABLE bank_account ADD COLUMN loans_missed INTEGER DEFAULT 0;")
+        db.session.execute(text("ALTER TABLE bank_account ADD COLUMN loans_missed INTEGER DEFAULT 0;"))
+        added_columns.append("loans_missed")
 
-    for q in queries:
-        db.session.execute(q)
     db.session.commit()
 
     return jsonify({
         "status": "success",
-        "added_columns": [q.split(" ")[5] for q in queries] if queries else [],
+        "added_columns": added_columns,
         "message": "bank_account table upgraded or already up to date."
     })
+
+
+@app.route('/admin/download-db-backup', methods=['GET'])
+@login_required
+def download_db_backup():
+    # Only admin can access
+    if g.user.username != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    # Backup file path
+    backup_file = os.path.join("backups", "viggo_db_backup.dump")
+
+    # Ensure backup folder exists
+    os.makedirs("backups", exist_ok=True)
+
+    # PostgreSQL credentials from your config
+    host = "dpg-d2su8c3e5dus73d9md0g-a.frankfurt-postgres.render.com"
+    user = "viggo_db_user"
+    db_name = "viggo_db"
+    password = "LaL1YWC59icz3L8ZRAifMTXNnBonZ4YM"
+
+    # Set PGPASSWORD env variable so pg_dump doesn't prompt
+    os.environ["PGPASSWORD"] = password
+
+    # Run pg_dump
+    try:
+        subprocess.run([
+            "pg_dump",
+            "-h", host,
+            "-U", user,
+            "-d", db_name,
+            "-F", "c",
+            "-b",
+            "-v",
+            "-f", backup_file
+        ], check=True)
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"Backup failed: {str(e)}"}), 500
+
+    # Return file for download
+    return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
 
 
  # --- Run app ---
