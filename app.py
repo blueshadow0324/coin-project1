@@ -877,35 +877,37 @@ from flask import jsonify
 from sqlalchemy import text
 from flask import jsonify
 
-@app.route('/admin/upgrade-bank-table', methods=['GET'])
+from flask import Flask, g, redirect, url_for, flash
+from sqlalchemy import text
+from your_app import app, db, login_required
+
+@app.route("/admin/upgrade-bank", methods=["GET"])
 @login_required
-def upgrade_bank_table():
-    # Only admin can access
-    if g.user.username != "admin":
-        return jsonify({"error": "Unauthorized"}), 403
+def upgrade_bank():
+    # Only allow admin
+    if not g.user or g.user.username != "admin":
+        flash("Admin access required", "danger")
+        return redirect(url_for("dashboard"))
 
-    inspector = inspect(db.engine)
-    columns = [col['name'] for col in inspector.get_columns('bank_account')]
-    added_columns = []
+    # List of columns to ensure exist
+    columns_to_add = {
+        "loan_taken_at": "TIMESTAMP",
+        "loans_taken": "INTEGER DEFAULT 0",
+        "loans_repaid_on_time": "INTEGER DEFAULT 0",
+        "loans_missed": "INTEGER DEFAULT 0"
+    }
 
-    # Add missing columns
-    if "loans_taken" not in columns:
-        db.session.execute(text("ALTER TABLE bank_account ADD COLUMN loans_taken INTEGER DEFAULT 0;"))
-        added_columns.append("loans_taken")
-    if "loans_repaid_on_time" not in columns:
-        db.session.execute(text("ALTER TABLE bank_account ADD COLUMN loans_repaid_on_time INTEGER DEFAULT 0;"))
-        added_columns.append("loans_repaid_on_time")
-    if "loans_missed" not in columns:
-        db.session.execute(text("ALTER TABLE bank_account ADD COLUMN loans_missed INTEGER DEFAULT 0;"))
-        added_columns.append("loans_missed")
+    for col, col_type in columns_to_add.items():
+        try:
+            # Add column if not exists
+            sql = f'ALTER TABLE bank_account ADD COLUMN IF NOT EXISTS {col} {col_type};'
+            db.session.execute(text(sql))
+        except Exception as e:
+            print(f"Error adding column {col}: {e}")
 
     db.session.commit()
+    return "✅ Bank table upgraded safely. Missing columns added if they did not exist."
 
-    return jsonify({
-        "status": "success",
-        "added_columns": added_columns,
-        "message": "bank_account table upgraded or already up to date."
-    })
 
 
 @app.route('/admin/download-db-backup', methods=['GET'])
