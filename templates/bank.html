@@ -42,13 +42,6 @@
             <p class="display-6 {% if account.credit_score >= 700 %}text-success{% elif account.credit_score >= 500 %}text-warning{% else %}text-danger{% endif %}">
                 {{ account.credit_score }}
             </p>
-            <div class="progress" style="height: 20px;">
-                <div class="progress-bar {% if account.credit_score >= 700 %}bg-success{% elif account.credit_score >= 500 %}bg-warning{% else %}bg-danger{% endif %}"
-                     role="progressbar"
-                     style="width: {{ (account.credit_score - 300) / 550 * 100 }}%;"
-                     aria-valuenow="{{ account.credit_score }}" aria-valuemin="300" aria-valuemax="850">
-                </div>
-            </div>
         </div>
     </div>
 
@@ -67,85 +60,33 @@
         </div>
     </div>
 
-    <!-- Chart -->
-    <div class="card mt-4 shadow-lg">
-        <div class="card-body">
-            <h5 class="card-title text-center">📈 Balance & Loan History</h5>
-            <canvas id="bankChart" width="600" height="300"></canvas>
-        </div>
-    </div>
-
     <!-- Bank History Table -->
-    <div class="card mt-4 shadow-lg">
-        <div class="card-body">
-            <h5 class="card-title">📜 Bank History</h5>
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Note</th>
-                    </tr>
-                </thead>
-                <tbody>
-  {% for t in transactions %}
-  <tr>
-    <td>{{ t.timestamp|datetimeformat }}</td>
-    <td>{{ t.type }}</td>
-    <td>{{ t.amount }}</td>
-    <td>{{ t.note or "-" }}</td>
-  </tr>
-  {% endfor %}
-</tbody>
-
-            </table>
-        </div>
-    </div>
+    <h2 class="mt-5">Bank History</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if transactions %}
+                {% for t in transactions %}
+                <tr>
+                    <td>{{ t.timestamp|datetimeformat }}</td>
+                    <td>{{ t.type|capitalize }}</td>
+                    <td>{{ t.amount }}</td>
+                    <td>{{ t.note or "-" }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">No transactions yet.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
 </div>
-
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-const ctx = document.getElementById('bankChart').getContext('2d');
-<td>{{ t.timestamp|datetimeformat }}</td>
-const balanceData = {{ transactions|map(attribute='balance')|list }};
-const loanData = {{ transactions|map(attribute='loan')|list }};
-
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: labels,
-        datasets: [
-            {
-                label: 'Balance',
-                data: balanceData,
-                borderColor: 'green',
-                backgroundColor: 'rgba(0,255,0,0.1)',
-                fill: true,
-                tension: 0.3
-            },
-            {
-                label: 'Loan',
-                data: loanData,
-                borderColor: 'red',
-                backgroundColor: 'rgba(255,0,0,0.1)',
-                fill: true,
-                tension: 0.3
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { position: 'top' },
-            title: { display: true, text: 'Balance & Loan Over Time' }
-        },
-        scales: {
-            y: { beginAtZero: true }
-        }
-    }
-});
-</script>
-
 {% endblock %}

@@ -19,11 +19,19 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+from datetime import datetime, date
+
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format="%Y-%m-%d %H:%M"):
-    if value is None:
+    try:
+        if value is None:
+            return "-"
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        return value.strftime(format)
+    except Exception:
         return "-"
-    return value.strftime(format)
+
 
  # --- Run app ---
 
