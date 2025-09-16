@@ -824,12 +824,37 @@ from flask import g
 from sqlalchemy import text
 from datetime import date
 
-@app.route("/admin/upgrade-bank", methods=["GET"])
+from sqlalchemy import inspect
+from flask import jsonify
+
+@app.route('/admin/upgrade-bank-table', methods=['GET'])
 @login_required
-@admin_required
-def upgrade_bank_table_route():
-    with app.app_context():
-        db.create_all()
+def upgrade_bank_table():
+    # Only allow admin users
+    if g.user.username != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    inspector = inspect(db.engine)
+    columns = [col['name'] for col in inspector.get_columns('bank_account')]
+    queries = []
+
+    # Add missing columns
+    if "loans_taken" not in columns:
+        queries.append("ALTER TABLE bank_account ADD COLUMN loans_taken INTEGER DEFAULT 0;")
+    if "loans_repaid_on_time" not in columns:
+        queries.append("ALTER TABLE bank_account ADD COLUMN loans_repaid_on_time INTEGER DEFAULT 0;")
+    if "loans_missed" not in columns:
+        queries.append("ALTER TABLE bank_account ADD COLUMN loans_missed INTEGER DEFAULT 0;")
+
+    for q in queries:
+        db.session.execute(q)
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "added_columns": [q.split(" ")[5] for q in queries] if queries else [],
+        "message": "bank_account table upgraded or already up to date."
+    })
 
 
  # --- Run app ---
