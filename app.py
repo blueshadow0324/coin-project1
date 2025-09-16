@@ -816,51 +816,10 @@ from datetime import date
 @login_required
 @admin_required
 def upgrade_bank_table_route():
-    """
-    GET route to create the bank_account table if missing
-    and create accounts for users who don't have one yet.
-    """
-    messages = []
-
     with app.app_context():
-        conn = db.engine.connect()
-
-        # 1️⃣ Create the table if it doesn't exist
-        try:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS bank_account (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER UNIQUE NOT NULL REFERENCES "user"(id),
-                    balance INTEGER DEFAULT 0,
-                    loan INTEGER DEFAULT 0,
-                    credit_score INTEGER DEFAULT 500,
-                    last_interest_date DATE DEFAULT CURRENT_DATE
-                )
-            """))
-            messages.append("✅ bank_account table created or already exists.")
-        except Exception as e:
-            messages.append(f"⚠️ Could not create table: {e}")
-
-        # 2️⃣ Backfill users without a bank account
-        try:
-            conn.execute(text(f"""
-                INSERT INTO bank_account (user_id, balance, loan, credit_score, last_interest_date)
-                SELECT id, 0, 0, 500, '{date.today()}'
-                FROM "user"
-                WHERE id NOT IN (SELECT user_id FROM bank_account)
-            """))
-            messages.append("✅ Existing users backfilled with default bank accounts.")
-        except Exception as e:
-            messages.append(f"⚠️ Could not backfill users: {e}")
-
-        conn.close()
-        db.session.commit()
-
-    return "<br>".join(messages)
+        db.create_all()
 
 
-
-
-# --- Run app ---
+ # --- Run app ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
