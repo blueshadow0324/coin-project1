@@ -808,29 +808,53 @@ def toggle_ui():
     flash(f"Switched to {g.user.ui_mode} mode!", "success")
     return redirect(url_for("snake"))
 
-@app.route("/admin/upgrade-bank", methods=["GET", "POST"])
-@login_required
-@admin_required   # only admin should be able to trigger this
-def upgrade_bank_table_route():
-    from sqlalchemy import text
+from flask import g
+from sqlalchemy import text
+from datetime import date
 
-    conn = db.engine.connect()
+@app.route("/admin/upgrade-bank", methods=["GET"])
+@login_required
+@admin_required
+def upgrade_bank_table_route():
+    """
+    GET route to create the bank_account table if missing
+    and create accounts for users who don't have one yet.
+    """
     messages = []
 
-    try:
-        conn.execute(text("ALTER TABLE bank_account ADD COLUMN credit_score INTEGER DEFAULT 500"))
-        messages.append("✅ Added credit_score column")
-    except Exception as e:
-        messages.append(f"⚠️ credit_score column already exists: {e}")
+    with app.app_context():
+        conn = db.engine.connect()
 
-    try:
-        conn.execute(text("ALTER TABLE bank_account ADD COLUMN last_interest_date DATE"))
-        messages.append("✅ Added last_interest_date column")
-    except Exception as e:
-        messages.append(f"⚠️ last_interest_date column already exists: {e}")
+        # 1️⃣ Create the table if it doesn't exist
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS bank_account (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER UNIQUE NOT NULL REFERENCES "user"(id),
+                    balance INTEGER DEFAULT 0,
+                    loan INTEGER DEFAULT 0,
+                    credit_score INTEGER DEFAULT 500,
+                    last_interest_date DATE DEFAULT CURRENT_DATE
+                )
+            """))
+            messages.append("✅ bank_account table created or already exists.")
+        except Exception as e:
+            messages.append(f"⚠️ Could not create table: {e}")
 
-    conn.close()
-    db.session.commit()
+        # 2️⃣ Backfill users without a bank account
+        try:
+            conn.execute(text(f"""
+                INSERT INTO bank_account (user_id, balance, loan, credit_score, last_interest_date)
+                SELECT id, 0, 0, 500, '{date.today()}'
+                FROM "user"
+                WHERE id NOT IN (SELECT user_id FROM bank_account)
+            """))
+            messages.append("✅ Existing users backfilled with default bank accounts.")
+        except Exception as e:
+            messages.append(f"⚠️ Could not backfill users: {e}")
+
+        conn.close()
+        db.session.commit()
 
     return "<br>".join(messages)
 
