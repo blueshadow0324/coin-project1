@@ -879,7 +879,6 @@ from flask import jsonify
 
 from flask import Flask, g, redirect, url_for, flash
 from sqlalchemy import text
-from your_app import app, db, login_required
 
 @app.route("/admin/upgrade-bank", methods=["GET"])
 @login_required
