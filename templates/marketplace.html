@@ -1,7 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Marketplace</h2>
-<a href="{{ url_for('add_item') }}" class="btn btn-primary mb-3">+ Lägg till objekt</a>
+<a href="{{ url_for('my_bought_items') }}" class="button">Mina köpta objekt</a>
+<a href="{{ url_for('my_sold_items') }}" class="button">Mina sålda objekt</a>
+<b href="{{ url_for('add_item') }}" class="btn btn-primary mb-3">+ Lägg till objekt</b>
+
+<style>
+    a.button {
+    background-color: #007BFF; /* Blue color */
+    color: white; /* Text color */
+    padding: 5px 10px; /* smaller padding */
+    border: none;
+    border-radius: 4px; /* slightly smaller corners */
+    font-size: 14px; /* smaller text */
+    cursor: pointer; /* Pointer on hover */
+    transition: background-color 0.3s; /* Smooth hover transition */
+
+}
+</style>
 
 {% for item in items %}
 <div class="card mb-3">
@@ -15,7 +31,16 @@
         <p><strong>Pris:</strong> {{ item.price }} coins</p>
         <p><strong>Säljare:</strong> {{ item.seller.username }}</p>
 
-        {% if item.seller_id == user.id %}
+        {% if item.buyer_id %}
+            <p><strong>Köpare:</strong> {{ item.buyer.username }}</p>
+        {% endif %}
+
+        {% if g.user.username == "admin" %}
+            <!-- Admin can delete anything -->
+            <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" style="display:inline;">
+                <button class="btn btn-danger btn-sm" type="submit">Ta bort (Admin)</button>
+            </form>
+        {% elif item.seller_id == user.id %}
             <small>Du är säljaren</small><br>
             {% if not item.buyer_id %}
                 <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" style="display:inline;">

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Objekt du köpt</h2>
+<a href="{{ url_for('marketplace') }}" class="btn btn-secondary mb-3">Tillbaka till marknaden</a>
+
+{% for item in items %}
+<div class="card mb-3">
+    <div class="card-body">
+        {% if item.image_filename %}
+            <img src="{{ url_for('static', filename='uploads/' ~ item.image_filename) }}"
+                 class="img-thumbnail" style="max-height:150px;">
+        {% endif %}
+        <h5 class="card-title">{{ item.title }}</h5>
+        <p class="card-text">{{ item.description }}</p>
+        <p><strong>Pris:</strong> {{ item.price }} coins</p>
+        <p><strong>Säljare:</strong> {{ item.seller.username }}</p>
+        <p><strong>Såld:</strong> {{ item.sold_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    </div>
+</div>
+{% else %}
+<p>Du har inte köpt några objekt ännu.</p>
+{% endfor %}
+{% endblock %}

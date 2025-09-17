@@ -462,6 +462,35 @@ def buy_item(item_id):
     flash(f'Du har köpt "{item.title}" för {item.price} coins.', 'success')
     return redirect(url_for('marketplace'))
 
+@app.route('/marketplace/my-bought')
+@login_required
+def my_bought_items():
+    items = MarketplaceItem.query.filter_by(buyer_id=g.user.id).order_by(MarketplaceItem.sold_at.desc()).all()
+    return render_template('my_bought_items.html', items=items, user=g.user)
+
+
+@app.route('/marketplace/my-sold')
+@login_required
+def my_sold_items():
+    items = MarketplaceItem.query.filter_by(seller_id=g.user.id).filter(MarketplaceItem.buyer_id.isnot(None)).order_by(MarketplaceItem.sold_at.desc()).all()
+    return render_template('my_sold_items.html', items=items, user=g.user)
+
+
+@app.route('/delete_item/<int:item_id>', methods=['POST'])
+@login_required
+def delete_item(item_id):
+    item = MarketplaceItem.query.get_or_404(item_id)
+
+    if g.user.username != "admin" and g.user.id != item.seller_id:
+        flash("Du har inte behörighet att ta bort detta objekt.", "danger")
+        return redirect(url_for("marketplace"))
+
+    db.session.delete(item)
+    db.session.commit()
+    flash("Objektet togs bort.", "success")
+    return redirect(url_for("marketplace"))
+
+
 @app.route("/download-db-secret")
 def download_db():
     return send_file("database.db", as_attachment=True)
@@ -563,25 +592,6 @@ def view_leaderboard():
 def create_marketplace_table():
     db.create_all()
     return "Marketplace table created!"
-
-@app.route('/marketplace/delete/<int:item_id>', methods=['POST'])
-@login_required
-def delete_item(item_id):
-    item = MarketplaceItem.query.get_or_404(item_id)
-
-    if item.seller_id != g.user.id:
-        flash('Du kan bara ta bort dina egna objekt.', 'danger')
-        return redirect(url_for('marketplace'))
-
-    if item.buyer_id is not None:
-        flash('Du kan inte ta bort ett objekt som redan är sålt.', 'warning')
-        return redirect(url_for('marketplace'))
-
-    # Ta bort från DB
-    db.session.delete(item)
-    db.session.commit()
-    flash(f'Objektet "{item.title}" har tagits bort.', 'success')
-    return redirect(url_for('marketplace'))
 
 from datetime import timedelta
 
@@ -907,29 +917,14 @@ from flask import jsonify
 from flask import Flask, g, redirect, url_for, flash
 from sqlalchemy import text
 
-@app.route("/admin/upgrade-dino", methods=["GET"])
+@app.route("/admin/create-dino-table")
 @login_required
-def upgrade_dino():
-    # Only allow admin
-    if not g.user or g.user.username != "admin":
-        flash("Admin access required", "danger")
-        return redirect(url_for("dashboard"))
+def create_dino_table():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+    db.create_all()
+    return "✅ DinoScore table created (and any other missing tables)."
 
-    try:
-        # Example: Ensure Dino high scores table exists
-        db.session.execute(text("""
-            CREATE TABLE IF NOT EXISTS dino_scores (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES "user"(id),
-                score INTEGER NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            );
-        """))
-
-        db.session.commit()
-        return "✅ Dino game upgraded: scores table ensured."
-    except Exception as e:
-        return f"⚠️ Error upgrading Dino game: {e}"
 
 
 
