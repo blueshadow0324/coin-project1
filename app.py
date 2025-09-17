@@ -997,12 +997,15 @@ def dino():
 @login_required
 def dino_submit():
     data = request.get_json()
-    score = data.get("score", 0)
+    score = int(data.get("score", 0))
 
-    db.session.add(DinoScore(user_id=g.user.id, score=score))
+    # Save score
+    new_score = DinoScore(user_id=g.user.id, score=score)
+    db.session.add(new_score)
     db.session.commit()
 
     return jsonify({"success": True, "score": score})
+
 
 
 
