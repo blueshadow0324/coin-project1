@@ -8,6 +8,26 @@
 
 <h3>Your Highscore: {{ user_highscore }}</h3>
 
+<h3>🏆 Leaderboard</h3>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Rank</th>
+      <th>Player</th>
+      <th>Highscore</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry in leaderboard %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ entry.username }}</td>
+      <td>{{ entry.high }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 <script>
 const canvas = document.getElementById("dinoGame");
 const ctx = canvas.getContext("2d");
@@ -87,6 +107,7 @@ function gameLoop() {
 
 function gameOver() {
     gameRunning = false;
+    alert("Game Over! Score: " + score);
 
     // Send score to backend
     fetch("/dino/submit", {
@@ -97,7 +118,7 @@ function gameOver() {
     .then(res => res.json())
     .then(data => {
         console.log(data);
-        location.reload(); // reload page to update highscore
+        location.reload(); // reload page to update highscore + leaderboard
     });
 }
 </script>
