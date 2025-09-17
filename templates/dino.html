@@ -3,8 +3,10 @@
 {% block content %}
 <h2>Dino Game</h2>
 <p>Press <strong>Space</strong> to start or jump!</p>
+
 <canvas id="dinoGame" width="800" height="200" style="border:1px solid #000;"></canvas>
 <p id="scoreDisplay">Score: 0</p>
+<p id="gameOverMsg" style="color:red; font-weight:bold;"></p>
 
 <h3>Your Highscore: {{ user_highscore }}</h3>
 
@@ -37,14 +39,27 @@ let score = 0;
 let frameCount = 0;
 let speed = 5;
 
-let dino = { x: 50, y: 150, width: 20, height: 20, vy: 0, gravity: 1, jump: -15 };
+// Ground level
+const groundY = 180;
+
+// Dino setup
+let dino = { 
+    x: 50, 
+    y: groundY, 
+    width: 20, 
+    height: 20, 
+    vy: 0, 
+    gravity: 1, 
+    jump: -15 
+};
+
 let obstacles = [];
 
 // Handle space key
 document.addEventListener("keydown", (e) => {
     if (e.code === "Space") {
         if (!gameRunning) startGame();
-        else if (dino.y >= 150) dino.vy = dino.jump;
+        else if (dino.y >= groundY) dino.vy = dino.jump;
     }
 });
 
@@ -54,23 +69,28 @@ function startGame() {
     frameCount = 0;
     speed = 5;
     obstacles = [];
-    dino.y = 150;
+    dino.y = groundY;
     dino.vy = 0;
+    document.getElementById("gameOverMsg").innerText = "";
     requestAnimationFrame(gameLoop);
 }
 
 function generateObstacle() {
-    const height = Math.random() * 40 + 20; // random obstacle height
-    obstacles.push({ x: canvas.width, y: 200 - height, width: 20, height });
+    const height = Math.random() * 40 + 20;
+    obstacles.push({ x: canvas.width, y: groundY + dino.height - height, width: 20, height });
 }
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw ground
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, groundY + dino.height, canvas.width, 2);
+
     // Dino physics
     dino.vy += dino.gravity;
     dino.y += dino.vy;
-    if (dino.y > 150) { dino.y = 150; dino.vy = 0; }
+    if (dino.y > groundY) { dino.y = groundY; dino.vy = 0; }
 
     ctx.fillStyle = "green";
     ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
@@ -98,7 +118,7 @@ function gameLoop() {
     score += 1;
     document.getElementById("scoreDisplay").innerText = "Score: " + score;
 
-    // Increase speed over time for difficulty
+    // Increase speed over time
     if (score % 200 === 0) speed += 1;
 
     frameCount++;
@@ -107,9 +127,9 @@ function gameLoop() {
 
 function gameOver() {
     gameRunning = false;
-    alert("Game Over! Score: " + score);
+    document.getElementById("gameOverMsg").innerText = "Game Over! Final Score: " + score;
 
-    // Send score to backend
+    // Save score
     fetch("/dino/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -117,8 +137,8 @@ function gameOver() {
     })
     .then(res => res.json())
     .then(data => {
-        console.log(data);
-        location.reload(); // reload page to update highscore + leaderboard
+        console.log("Score saved:", data);
+        setTimeout(() => location.reload(), 1000); // reload leaderboard after saving
     });
 }
 </script>
