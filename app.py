@@ -969,59 +969,41 @@ def download_db_backup():
     return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
 
 class DinoScore(db.Model):
+    __tablename__ = "dino_score"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False, index=True)
-
-    user = db.relationship('User', backref='dino_scores')
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 @app.route("/dino")
 @login_required
 def dino():
-    # All-time highscore leaderboard
-    highscore_list = (
-        db.session.query(User.username, func.max(DinoScore.score).label("high"))
-        .join(DinoScore)
+    # user highscore
+    user_highscore = db.session.query(db.func.max(DinoScore.score)).filter_by(user_id=g.user.id).scalar() or 0
+
+    # leaderboard (top 10)
+    leaderboard = (
+        db.session.query(User.username, db.func.max(DinoScore.score).label("high"))
+        .join(DinoScore, User.id == DinoScore.user_id)
         .group_by(User.id)
-        .order_by(func.max(DinoScore.score).desc())
+        .order_by(db.func.max(DinoScore.score).desc())
+        .limit(10)
         .all()
     )
 
-    # User all-time highscore
-    user_highscore = (
-        db.session.query(func.max(DinoScore.score))
-        .filter(DinoScore.user_id == g.user.id)
-        .scalar()
-        or 0
-    )
-
-    return render_template(
-        "dino.html",
-        user=g.user,
-        highscore_list=highscore_list,
-        user_highscore=user_highscore
-    )
-
+    return render_template("dino.html", user_highscore=user_highscore, leaderboard=leaderboard)
 
 @app.route("/dino/submit", methods=["POST"])
 @login_required
 def dino_submit():
     data = request.get_json()
-    score = data.get("score")
+    score = data.get("score", 0)
 
-    if not isinstance(score, int) or score < 0:
-        return jsonify({"error": "Invalid score"}), 400
-
-    today = date.today()
-
-    # Save score
-    new_score = DinoScore(user_id=g.user.id, score=score, date=today)
-    g.user.coins += score  # 1 coin reward per score
-    db.session.add(new_score)
+    db.session.add(DinoScore(user_id=g.user.id, score=score))
     db.session.commit()
 
-    return jsonify({"message": "Score saved", "score": score, "coins": g.user.coins})
+    return jsonify({"success": True, "score": score})
+
 
 
 if __name__ == '__main__':
