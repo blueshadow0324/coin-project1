@@ -836,7 +836,7 @@ def bank():
     )
 
 
-@app.route('/admin/close-day', methods=['POST'])
+@app.route('/admin/close-day', methods=['POST', 'GET'])
 @login_required
 def close_day():
     if g.user.username != ADMIN_USERNAME:
