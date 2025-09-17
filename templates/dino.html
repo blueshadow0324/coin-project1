@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Chrome Dino</h2>
+<p>Your highscore: {{ user_highscore }}</p>
+
+<canvas id="gameCanvas" width="800" height="200" style="border:1px solid black;"></canvas>
+<p id="score">Score: 0</p>
+
+<h3>Leaderboard</h3>
+<ol>
+    {% for entry in highscore_list %}
+        <li>{{ entry.username }} - {{ entry.high }}</li>
+    {% endfor %}
+</ol>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let dino = { x: 50, y: 150, width: 20, height: 40, dy: 0, jumping: false };
+let gravity = 0.8, jumpPower = -12;
+let obstacles = [];
+let frame = 0, score = 0, gameOver = false;
+
+function drawDino() {
+  ctx.fillStyle = "green";
+  ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+}
+
+function drawObstacles() {
+  ctx.fillStyle = "red";
+  obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.width, o.height));
+}
+
+function update() {
+  if (gameOver) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  dino.y += dino.dy;
+  if (dino.y + dino.height < canvas.height) {
+    dino.dy += gravity;
+  } else {
+    dino.y = canvas.height - dino.height;
+    dino.dy = 0;
+    dino.jumping = false;
+  }
+
+  if (frame % 90 === 0) {
+    obstacles.push({ x: canvas.width, y: 160, width: 20, height: 40 });
+  }
+
+  obstacles.forEach(o => o.x -= 5);
+  obstacles = obstacles.filter(o => o.x + o.width > 0);
+
+  obstacles.forEach(o => {
+    if (dino.x < o.x + o.width &&
+        dino.x + dino.width > o.x &&
+        dino.y < o.y + o.height &&
+        dino.y + dino.height > o.y) {
+      endGame();
+    }
+  });
+
+  drawDino();
+  drawObstacles();
+
+  score++;
+  document.getElementById("score").innerText = "Score: " + score;
+
+  frame++;
+  requestAnimationFrame(update);
+}
+
+function jump() {
+  if (!dino.jumping) {
+    dino.dy = jumpPower;
+    dino.jumping = true;
+  }
+}
+
+function endGame() {
+  gameOver = true;
+  ctx.fillStyle = "black";
+  ctx.font = "30px Arial";
+  ctx.fillText("Game Over!", 300, 100);
+
+  fetch("/dino/submit", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({score: score})
+  }).then(res => res.json()).then(data => console.log(data));
+}
+
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") jump();
+});
+
+update();
+</script>
+{% endblock %}

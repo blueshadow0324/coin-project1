@@ -907,32 +907,29 @@ from flask import jsonify
 from flask import Flask, g, redirect, url_for, flash
 from sqlalchemy import text
 
-@app.route("/admin/upgrade-bank", methods=["GET"])
+@app.route("/admin/upgrade-dino", methods=["GET"])
 @login_required
-def upgrade_bank():
+def upgrade_dino():
     # Only allow admin
     if not g.user or g.user.username != "admin":
         flash("Admin access required", "danger")
         return redirect(url_for("dashboard"))
 
-    # List of columns to ensure exist
-    columns_to_add = {
-        "loan_taken_at": "TIMESTAMP",
-        "loans_taken": "INTEGER DEFAULT 0",
-        "loans_repaid_on_time": "INTEGER DEFAULT 0",
-        "loans_missed": "INTEGER DEFAULT 0"
-    }
+    try:
+        # Example: Ensure Dino high scores table exists
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS dino_scores (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES "user"(id),
+                score INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        """))
 
-    for col, col_type in columns_to_add.items():
-        try:
-            # Add column if not exists
-            sql = f'ALTER TABLE bank_account ADD COLUMN IF NOT EXISTS {col} {col_type};'
-            db.session.execute(text(sql))
-        except Exception as e:
-            print(f"Error adding column {col}: {e}")
-
-    db.session.commit()
-    return "✅ Bank table upgraded safely. Missing columns added if they did not exist."
+        db.session.commit()
+        return "✅ Dino game upgraded: scores table ensured."
+    except Exception as e:
+        return f"⚠️ Error upgrading Dino game: {e}"
 
 
 
@@ -975,6 +972,61 @@ def download_db_backup():
 
     # Return file for download
     return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
+
+class DinoScore(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+
+    user = db.relationship('User', backref='dino_scores')
+
+@app.route("/dino")
+@login_required
+def dino():
+    # All-time highscore leaderboard
+    highscore_list = (
+        db.session.query(User.username, func.max(DinoScore.score).label("high"))
+        .join(DinoScore)
+        .group_by(User.id)
+        .order_by(func.max(DinoScore.score).desc())
+        .all()
+    )
+
+    # User all-time highscore
+    user_highscore = (
+        db.session.query(func.max(DinoScore.score))
+        .filter(DinoScore.user_id == g.user.id)
+        .scalar()
+        or 0
+    )
+
+    return render_template(
+        "dino.html",
+        user=g.user,
+        highscore_list=highscore_list,
+        user_highscore=user_highscore
+    )
+
+
+@app.route("/dino/submit", methods=["POST"])
+@login_required
+def dino_submit():
+    data = request.get_json()
+    score = data.get("score")
+
+    if not isinstance(score, int) or score < 0:
+        return jsonify({"error": "Invalid score"}), 400
+
+    today = date.today()
+
+    # Save score
+    new_score = DinoScore(user_id=g.user.id, score=score, date=today)
+    g.user.coins += score  # 1 coin reward per score
+    db.session.add(new_score)
+    db.session.commit()
+
+    return jsonify({"message": "Score saved", "score": score, "coins": g.user.coins})
 
 
 if __name__ == '__main__':
