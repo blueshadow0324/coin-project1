@@ -138,8 +138,11 @@ function gameOver() {
     .then(res => res.json())
     .then(data => {
         console.log("Score saved:", data);
-        setTimeout(() => location.reload(), 1000); // reload leaderboard after saving
+        // Update the highscore display without reload
+        document.querySelector("h3").innerText = "Your Highscore: " + data.highscore;
     });
 }
+
+
 </script>
 {% endblock %}
