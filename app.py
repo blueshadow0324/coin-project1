@@ -978,20 +978,34 @@ class DinoScore(db.Model):
 @app.route("/dino")
 @login_required
 def dino():
-    # user highscore
-    user_highscore = db.session.query(db.func.max(DinoScore.score)).filter_by(user_id=g.user.id).scalar() or 0
+    # current user
+    current_user = g.user
+
+    # highscore for this user
+    highscore = (
+        db.session.query(func.max(DinoScore.score))
+        .filter(DinoScore.user_id == current_user.id)
+        .scalar()
+        or 0
+    )
 
     # leaderboard (top 10)
     leaderboard = (
-        db.session.query(User.username, db.func.max(DinoScore.score).label("high"))
+        db.session.query(User.username, func.max(DinoScore.score).label("high"))
         .join(DinoScore, User.id == DinoScore.user_id)
         .group_by(User.id)
-        .order_by(db.func.max(DinoScore.score).desc())
+        .order_by(func.max(DinoScore.score).desc())
         .limit(10)
         .all()
     )
 
-    return render_template("dino.html", user_highscore=user_highscore, leaderboard=leaderboard)
+    return render_template(
+        "dino.html",
+        user=current_user,        # 🔑 now available as {{ user }}
+        user_highscore=highscore, # shows "Your Highscore"
+        leaderboard=leaderboard   # leaderboard table
+    )
+
 
 @app.route("/dino/submit", methods=["POST"])
 @login_required
