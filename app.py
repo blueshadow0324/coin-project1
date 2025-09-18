@@ -969,17 +969,23 @@ def download_db_backup():
     return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
 
 class DinoScore(db.Model):
-    __tablename__ = "dino_score"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     score = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    date_played = db.Column(db.Date, nullable=False, index=True)  # renamed to avoid conflict
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='dino_scores')
+
 
 @app.route("/dino")
 @login_required
 def dino():
     # current user
     current_user = g.user
+
+    today = date.today()
+    new_score = DinoScore(user_id=g.user.id, score=score, date_played=today)
 
     # highscore for this user
     highscore = (
