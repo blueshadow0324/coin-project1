@@ -999,12 +999,16 @@ def dino_submit():
     data = request.get_json()
     score = int(data.get("score", 0))
 
-    # Save score
+    # Save new score
     new_score = DinoScore(user_id=g.user.id, score=score)
     db.session.add(new_score)
     db.session.commit()
 
-    return jsonify({"success": True, "score": score})
+    # Get updated personal highscore
+    highscore = db.session.query(db.func.max(DinoScore.score)).filter_by(user_id=g.user.id).scalar() or 0
+
+    return jsonify({"success": True, "score": score, "highscore": highscore})
+
 
 
 
