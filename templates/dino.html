@@ -1,27 +1,24 @@
 {% extends "base.html" %}
-
 {% block content %}
 <h2>Dino Game</h2>
-<p>Press <strong>Space</strong> to start or jump!</p>
+<p>Press <strong>Space</strong> to start / restart and to jump.</p>
 
-<canvas id="dinoGame" width="800" height="200" style="border:1px solid #000;"></canvas>
-<p id="scoreDisplay">Score: 0</p>
-<p id="gameOverMsg" style="color:red; font-weight:bold;"></p>
+<canvas id="dinoGame" width="800" height="220" style="border:1px solid #000; display:block; margin-bottom:10px;"></canvas>
 
-<h3>Your Highscore: {{ user_highscore }}</h3>
+<div style="display:flex;gap:20px;align-items:center;">
+  <div id="scoreDisplay" style="font-weight:bold">Score: 0</div>
+  <div id="highscoreDisplay">Your Highscore: {{ user_highscore }}</div>
+  <div id="gameOverMsg" style="color:#c00; font-weight:bold;"></div>
+</div>
 
 <h3>🏆 Leaderboard</h3>
 <table class="table table-striped">
   <thead>
-    <tr>
-      <th>Rank</th>
-      <th>Player</th>
-      <th>Highscore</th>
-    </tr>
+    <tr><th>Rank</th><th>Player</th><th>Highscore</th></tr>
   </thead>
-  <tbody>
+  <tbody id="leaderboardBody">
     {% for entry in leaderboard %}
-    <tr>
+    <tr {% if entry.username == user.username %}class="table-success"{% endif %}>
       <td>{{ loop.index }}</td>
       <td>{{ entry.username }}</td>
       <td>{{ entry.high }}</td>
@@ -31,118 +28,185 @@
 </table>
 
 <script>
-const canvas = document.getElementById("dinoGame");
-const ctx = canvas.getContext("2d");
+(() => {
+  const canvas = document.getElementById("dinoGame");
+  const ctx = canvas.getContext("2d");
 
-let gameRunning = false;
-let score = 0;
-let frameCount = 0;
-let speed = 5;
+  // Config
+  const GROUND_Y = 180;                // top coordinate where dino rests
+  const DINO_W = 24, DINO_H = 24;
+  const BASE_SPEED = 5;
+  const BASE_SPAWN_FRAMES = 90;
 
-// Ground level
-const groundY = 180;
+  // State
+  let gameRunning = false;
+  let score = 0;
+  let frameCount = 0;
+  let speed = BASE_SPEED;
+  let obstacles = [];
+  let rafId = null;
 
-// Dino setup
-let dino = { 
-    x: 50, 
-    y: groundY, 
-    width: 20, 
-    height: 20, 
-    vy: 0, 
-    gravity: 1, 
-    jump: -15 
-};
+  // Dino
+  let dino = {
+    x: 50,
+    y: GROUND_Y,
+    w: DINO_W,
+    h: DINO_H,
+    vy: 0,
+    gravity: 1.1,
+    jumpPower: -14
+  };
 
-let obstacles = [];
+  const scoreEl = document.getElementById("scoreDisplay");
+  const highscoreEl = document.getElementById("highscoreDisplay");
+  const gameOverEl = document.getElementById("gameOverMsg");
 
-// Handle space key
-document.addEventListener("keydown", (e) => {
-    if (e.code === "Space") {
-        if (!gameRunning) startGame();
-        else if (dino.y >= groundY) dino.vy = dino.jump;
-    }
-});
-
-function startGame() {
-    gameRunning = true;
+  function resetState() {
     score = 0;
     frameCount = 0;
-    speed = 5;
+    speed = BASE_SPEED;
     obstacles = [];
-    dino.y = groundY;
+    dino.y = GROUND_Y;
     dino.vy = 0;
-    document.getElementById("gameOverMsg").innerText = "";
-    requestAnimationFrame(gameLoop);
-}
+    gameOverEl.textContent = "";
+    scoreEl.textContent = "Score: 0";
+  }
 
-function generateObstacle() {
-    const height = Math.random() * 40 + 20;
-    obstacles.push({ x: canvas.width, y: groundY + dino.height - height, width: 20, height });
-}
+  function startGame() {
+    // cancel any left-over frame
+    if (rafId) cancelAnimationFrame(rafId);
+    resetState();
+    gameRunning = true;
+    rafId = requestAnimationFrame(gameLoop);
+  }
 
-function gameLoop() {
+  function spawnObstacle() {
+    // as score grows we spawn more often and obstacles become taller
+    const h = Math.floor(Math.random() * 40) + 20;
+    const y = GROUND_Y + dino.h - h; // align to ground
+    obstacles.push({ x: canvas.width + 10, y, w: 22, h, passed: false });
+  }
+
+  function jump() {
+    // allow jumping if on (or very near) the ground
+    if (dino.y >= GROUND_Y) {
+      dino.vy = dino.jumpPower;
+    }
+  }
+
+  function gameLoop() {
+    // clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw ground
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, groundY + dino.height, canvas.width, 2);
+    // Draw ground line
+    ctx.fillStyle = "#444";
+    ctx.fillRect(0, GROUND_Y + dino.h, canvas.width, 2);
 
     // Dino physics
     dino.vy += dino.gravity;
     dino.y += dino.vy;
-    if (dino.y > groundY) { dino.y = groundY; dino.vy = 0; }
+    if (dino.y > GROUND_Y) { dino.y = GROUND_Y; dino.vy = 0; }
 
-    ctx.fillStyle = "green";
-    ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+    // Draw dino
+    ctx.fillStyle = "#2c7";
+    ctx.fillRect(dino.x, Math.round(dino.y), dino.w, dino.h);
 
-    // Generate obstacles
-    if (frameCount % 90 === 0) generateObstacle();
+    // Spawning logic: spawn more often as score grows
+    const spawnFrames = Math.max(30, BASE_SPAWN_FRAMES - Math.floor(score / 120));
+    if (frameCount % spawnFrames === 0) spawnObstacle();
 
-    // Draw obstacles and check collision
-    ctx.fillStyle = "brown";
-    obstacles.forEach((obs, index) => {
-        obs.x -= speed;
-        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+    // Move & draw obstacles
+    ctx.fillStyle = "#8b5a2b";
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      o.x -= speed;
+      ctx.fillRect(Math.round(o.x), Math.round(o.y), o.w, o.h);
 
-        if (dino.x < obs.x + obs.width &&
-            dino.x + dino.width > obs.x &&
-            dino.y < obs.y + obs.height &&
-            dino.y + dino.height > obs.y) {
-            gameOver();
-        }
+      // mark passed for scoring (optional)
+      if (!o.passed && o.x + o.w < dino.x) { o.passed = true; }
 
-        if (obs.x + obs.width < 0) obstacles.splice(index, 1);
-    });
+      // collision
+      if (dino.x < o.x + o.w &&
+          dino.x + dino.w > o.x &&
+          dino.y < o.y + o.h &&
+          dino.y + dino.h > o.y) {
+        endGame();
+        return; // stop immediately
+      }
 
-    // Update score
+      if (o.x + o.w < -50) obstacles.splice(i, 1);
+    }
+
+    // Score & difficulty progression
     score += 1;
-    document.getElementById("scoreDisplay").innerText = "Score: " + score;
+    scoreEl.textContent = "Score: " + score;
 
-    // Increase speed over time
+    // bump speed gradually every X points
     if (score % 200 === 0) speed += 1;
 
     frameCount++;
-    if (gameRunning) requestAnimationFrame(gameLoop);
-}
+    rafId = requestAnimationFrame(gameLoop);
+  }
 
-function gameOver() {
+  function endGame() {
+    // stop loop
+    if (rafId) cancelAnimationFrame(rafId);
     gameRunning = false;
-    document.getElementById("gameOverMsg").innerText = "Game Over! Final Score: " + score;
+    gameOverEl.textContent = `Game Over — Score: ${score}. Press Space to restart.`;
 
-    // Save score
-    fetch("/dino/submit", {
+    // send score to backend (non-blocking)
+    try {
+      fetch("/dino/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ score: score })
-    })
-    .then(res => res.json())
-    .then(data => {
-        console.log("Score saved:", data);
-        // Update the highscore display without reload
-        document.querySelector("h3").innerText = "Your Highscore: " + data.highscore;
-    });
-}
+      })
+      .then(r => r.json())
+      .then(json => {
+        if (json && json.highscore !== undefined) {
+          highscoreEl.textContent = "Your Highscore: " + json.highscore;
+        } else if (json && json.score) {
+          // fallback
+          highscoreEl.textContent = "Your Highscore: " + json.score;
+        }
+        // optionally refresh leaderboard by reloading the page or fetching leaderboard JSON
+      })
+      .catch(err => console.warn("Score save failed:", err));
+    } catch (e) {
+      console.warn("Fetch failed:", e);
+    }
+  }
 
+  // universal key handler (Space/Up/W)
+  document.addEventListener("keydown", (e) => {
+    const code = e.code || e.key || e.keyCode;
+    const isSpace = code === "Space" || code === " " || code === 32 || code === "Spacebar";
+    if (!isSpace) return;
+    e.preventDefault();
 
+    // If not running -> start (initial start OR restart after death)
+    if (!gameRunning) {
+      startGame();
+      return;
+    }
+
+    // else perform jump
+    jump();
+  });
+
+  // ensure canvas is focusable and focused so keydown reliably received
+  canvas.setAttribute("tabindex", "0");
+  canvas.style.outline = "none";
+  canvas.addEventListener("click", () => canvas.focus());
+
+  // initial draw
+  (function initialDraw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#444";
+    ctx.fillRect(0, GROUND_Y + dino.h, canvas.width, 2);
+    ctx.fillStyle = "#2c7";
+    ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
+  })();
+})();
 </script>
 {% endblock %}

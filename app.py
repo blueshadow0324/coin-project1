@@ -996,18 +996,14 @@ def dino():
 @app.route("/dino/submit", methods=["POST"])
 @login_required
 def dino_submit():
-    data = request.get_json()
+    data = request.get_json() or {}
     score = int(data.get("score", 0))
-
-    # Save new score
-    new_score = DinoScore(user_id=g.user.id, score=score)
+    new_score = DinoScore(user_id=g.user.id, score=score, date=date.today())
     db.session.add(new_score)
     db.session.commit()
-
-    # Get updated personal highscore
-    highscore = db.session.query(db.func.max(DinoScore.score)).filter_by(user_id=g.user.id).scalar() or 0
-
+    highscore = db.session.query(func.max(DinoScore.score)).filter(DinoScore.user_id==g.user.id).scalar() or 0
     return jsonify({"success": True, "score": score, "highscore": highscore})
+
 
 
 
