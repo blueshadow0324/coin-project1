@@ -17,6 +17,12 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_size": 20,       # default 5
+    "max_overflow": 20,    # default 10
+    "pool_timeout": 30,    # seconds
+    "pool_recycle": 1800   # recycle connections every 30 minutes
+}
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
@@ -1193,30 +1199,7 @@ def update_avatar():
 
 @app.route('/admin/add-avatar-column')
 def add_avatar_column():
-    # Only admin can run
-    if not g.user or g.user.username != 'admin':
-        return "Unauthorized", 403
-
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(db.engine)
-    # Quote the table name for PostgreSQL
-    table_name = '"user"' if db.engine.dialect.name == 'postgresql' else 'user'
-
-    columns = [c['name'] for c in inspector.get_columns('user')]
-
-    if 'avatar' in columns:
-        return "'avatar' column already exists!"
-
-    # Modern SQLAlchemy: use a connection context
-    with db.engine.begin() as conn:
-        conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';'))
-
-    return "'avatar' column added successfully!"
-
-
-
-
+    db.create_all()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
