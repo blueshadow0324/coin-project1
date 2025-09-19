@@ -970,61 +970,51 @@ class DinoScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     score = db.Column(db.Integer, nullable=False)
-    date_played = db.Column(db.Date, nullable=False, index=True)  # renamed to avoid conflict
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    date = db.Column(db.Date, nullable=False, index=True)
 
-    user = db.relationship('User', backref='dino_scores')
-
-
-@app.route("/dino")
+@app.route('/dino')
 @login_required
 def dino():
-    # current user
-    current_user = g.user
-
-    today = date.today()
-    new_score = DinoScore(user_id=g.user.id, score=score, date_played=today)
-
-    # highscore for this user
-    highscore = (
-        db.session.query(func.max(DinoScore.score))
-        .filter(DinoScore.user_id == current_user.id)
-        .scalar()
-        or 0
-    )
-
-    # leaderboard (top 10)
+    # Leaderboard: top highscores
     leaderboard = (
-        db.session.query(User.username, func.max(DinoScore.score).label("high"))
-        .join(DinoScore, User.id == DinoScore.user_id)
+        db.session.query(User.username, func.max(DinoScore.score).label('high'))
+        .join(DinoScore)
         .group_by(User.id)
         .order_by(func.max(DinoScore.score).desc())
         .limit(10)
         .all()
     )
 
+    user_highscore = db.session.query(func.max(DinoScore.score)).filter(
+        DinoScore.user_id == g.user.id
+    ).scalar() or 0
+
     return render_template(
-        "dino.html",
-        user=current_user,        # 🔑 now available as {{ user }}
-        user_highscore=highscore, # shows "Your Highscore"
-        leaderboard=leaderboard   # leaderboard table
+        'dino.html',
+        leaderboard=leaderboard,
+        user=g.user,
+        user_highscore=user_highscore
     )
 
-
-@app.route("/dino/submit", methods=["POST"])
+@app.route('/dino/submit', methods=['POST'])
 @login_required
 def dino_submit():
-    data = request.get_json() or {}
-    score = int(data.get("score", 0))
-    new_score = DinoScore(user_id=g.user.id, score=score, date=date.today())
+    data = request.get_json()
+    score = data.get('score')
+    if not isinstance(score, int) or score < 0:
+        return jsonify({'error': 'Invalid score'}), 400
+
+    today = date.today()
+    new_score = DinoScore(user_id=g.user.id, score=score, date=today)
     db.session.add(new_score)
     db.session.commit()
-    highscore = db.session.query(func.max(DinoScore.score)).filter(DinoScore.user_id==g.user.id).scalar() or 0
-    return jsonify({"success": True, "score": score, "highscore": highscore})
 
+    # update highscore
+    highscore = db.session.query(func.max(DinoScore.score)).filter(
+        DinoScore.user_id == g.user.id
+    ).scalar()
 
-
-
+    return jsonify({'message': 'Score saved', 'highscore': highscore})
 
 
 if __name__ == '__main__':
