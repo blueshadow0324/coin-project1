@@ -36,17 +36,18 @@ ALLOWED_EXTENSIONS = {"db"}
 db = SQLAlchemy(app)
 
 from datetime import datetime, date
-
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 with app.app_context():
-    with db.engine.begin() as conn:
-        try:
-            conn.execute(text('ALTER TABLE "user" ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';'))
-        except Exception as e:
-            # Ignore if column already exists
-            if "duplicate column" not in str(e).lower():
-                raise
+    inspector = inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("user")]
+
+    if "avatar" not in columns:  # Only add if missing
+        with db.engine.begin() as conn:
+            conn.execute(
+                text('ALTER TABLE "user" ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';')
+            )
+
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format="%Y-%m-%d %H:%M"):
