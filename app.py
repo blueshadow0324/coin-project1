@@ -26,7 +26,27 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+ # --- Run app ---
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+ALLOWED_EXTENSIONS = {"db"}
+
+db = SQLAlchemy(app)
+
 from datetime import datetime, date
+
+from sqlalchemy import text
+
+with app.app_context():
+    with db.engine.begin() as conn:
+        try:
+            conn.execute(text('ALTER TABLE "user" ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';'))
+        except Exception as e:
+            # Ignore if column already exists
+            if "duplicate column" not in str(e).lower():
+                raise
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format="%Y-%m-%d %H:%M"):
@@ -40,24 +60,6 @@ def datetimeformat(value, format="%Y-%m-%d %H:%M"):
         return "-"
 
 
- # --- Run app ---
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-ALLOWED_EXTENSIONS = {"db"}
-
-db = SQLAlchemy(app)
-
-from sqlalchemy import text
-
-with db.engine.begin() as conn:
-    try:
-        conn.execute(text('ALTER TABLE "user" ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';'))
-    except Exception as e:
-        # Ignore if column already exists
-        if "duplicate column" not in str(e).lower():
-            raise
 
 # Models
 class User(db.Model):
