@@ -1200,6 +1200,9 @@ def add_avatar_column():
     from sqlalchemy import inspect, text
 
     inspector = inspect(db.engine)
+    # Quote the table name for PostgreSQL
+    table_name = '"user"' if db.engine.dialect.name == 'postgresql' else 'user'
+
     columns = [c['name'] for c in inspector.get_columns('user')]
 
     if 'avatar' in columns:
@@ -1207,9 +1210,10 @@ def add_avatar_column():
 
     # Modern SQLAlchemy: use a connection context
     with db.engine.begin() as conn:
-        conn.execute(text("ALTER TABLE user ADD COLUMN avatar TEXT DEFAULT 'avatar1.png';"))
+        conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';'))
 
     return "'avatar' column added successfully!"
+
 
 
 
