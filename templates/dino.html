@@ -6,25 +6,34 @@
 
 <div style="display:flex;gap:20px;align-items:center;">
   <div id="scoreDisplay" style="font-weight:bold">Score: 0</div>
-  <div id="highscoreDisplay">Your Highscore: {{ user_highscore }}</div>
+  <div id="highscoreDisplay">Highscore: {{ user_highscore }}</div>
   <div id="gameOverMsg" style="color:#c00; font-weight:bold;"></div>
 </div>
 
-<h3>🏆 Leaderboard</h3>
-<table class="table table-striped">
-  <thead>
-    <tr><th>Rank</th><th>Player</th><th>Highscore</th></tr>
-  </thead>
-  <tbody id="leaderboardBody">
-    {% for entry in leaderboard %}
-    <tr {% if entry.username == user.username %}class="table-success"{% endif %}>
-      <td>{{ loop.index }}</td>
-      <td>{{ entry.username }}</td>
-      <td>{{ entry.high }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
+<h3>🏆 Dagens Highscore</h3>
+<table>
+  <tr><th>Rank</th><th>Player</th><th>Score</th></tr>
+  {% for entry in today_highscore %}
+  <tr {% if entry.username == user.username %}class="table-success"{% endif %}>
+    <td>{{ loop.index }}</td>
+    <td>{{ entry.username }}</td>
+    <td>{{ entry.high }}</td>
+  </tr>
+  {% endfor %}
 </table>
+
+<h3>🌍 All-Time Highscores</h3>
+<table>
+  <tr><th>Rank</th><th>Player</th><th>Score</th></tr>
+  {% for entry in alltime_highscore %}
+  <tr {% if entry.username == user.username %}class="table-success"{% endif %}>
+    <td>{{ loop.index }}</td>
+    <td>{{ entry.username }}</td>
+    <td>{{ entry.high }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
 
 <script>
 (() => {

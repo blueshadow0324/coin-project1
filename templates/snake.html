@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+{% import "macros.html" as macros %}
 
 {% block content %}
-<h1>Snake - Spela och tjäna poäng</h1>
+<h1>Snake</h1>
+<td>{{ macros.user_link(entry) }}</td>
 
 <p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
 
@@ -20,7 +22,7 @@
 {% if today_total %}
 <ol>
 {% for username, total in today_total %}
-    <li>{{ username }} — {{ total }} poäng</li>
+    <li>{{ macros.user_link(username) }} — {{ total }} poäng</li>
 {% endfor %}
 </ol>
 {% else %}
@@ -31,7 +33,7 @@
 {% if today_highscore %}
 <ol>
 {% for username, high in today_highscore %}
-    <li>{{ username }} — {{ high }} poäng</li>
+    <li>{{ macros.user_link(username) }} — {{ high }} poäng</li>
 {% endfor %}
 </ol>
 {% else %}
@@ -42,7 +44,7 @@
 {% if alltime_total %}
 <ol>
 {% for username, total in alltime_total %}
-    <li>{{ username }} — {{ total }} poäng</li>
+    <li>{{ macros.user_link(username) }} — {{ total }} poäng</li>
 {% endfor %}
 </ol>
 {% else %}
@@ -53,7 +55,7 @@
 {% if alltime_highscore %}
 <ol>
 {% for username, high in alltime_highscore %}
-    <li>{{ username }} — {{ high }} poäng</li>
+    <li>{{ macros.user_link(username) }} — {{ high }} poäng</li>
 {% endfor %}
 </ol>
 {% else %}

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Profil - {{ profile_user.username }}{% endblock %}
+
+{% block content %}
+<style>
+/* Avatar selection container */
+.avatar-container {
+    display: flex;
+    flex-wrap: wrap;             /* wrap avatars into multiple rows */
+    gap: 16px;                   /* spacing between avatars */
+    justify-content: flex-start; /* left-align avatars */
+    margin-top: 16px;
+}
+
+.avatar-label {
+    width: 175px;
+    height: 162px;
+    cursor: pointer;
+    display: block;
+}
+
+.avatar-label input {
+    display: none;
+}
+
+.avatar-label img {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    object-fit: cover;
+    transition: border 0.2s;
+}
+
+.avatar-label img:hover {
+    border-color: #60A5FA; /* hover color */
+}
+
+.avatar-label input:checked + img {
+    border-color: #3B82F6; /* selected color */
+}
+
+.avatar-button {
+    margin-top: 16px;
+    padding: 10px 20px;
+    background-color: #3B82F6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.avatar-button:hover {
+    background-color: #2563EB;
+}
+
+/* Highscore bars */
+.bar-container {
+    width: 100%;
+    background: #E5E7EB;
+    border-radius: 9999px;
+    height: 16px;
+    margin-top: 4px;
+}
+
+.bar-fill {
+    height: 16px;
+    border-radius: 9999px;
+}
+
+@media (max-width: 600px) {
+    .avatar-label {
+        width: 140px;
+        height: 130px;
+    }
+}
+</style>
+
+<div class="profile-container" style="max-width: 900px; margin:auto; padding:24px; background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+    <div style="display:flex; flex-wrap:wrap; gap:24px;">
+
+        <!-- Left column: Current avatar + selection -->
+        <div style="flex:1 1 250px; background:#f9fafb; padding:16px; border-radius:12px;">
+            <!-- Current avatar -->
+            <img src="{{ url_for('static', filename='avatars/' ~ profile_user.avatar) }}"
+                 alt="Avatar" style="width:176px; height:176px; border-radius:50%; object-fit:cover; border:4px solid #D1D5DB; margin:auto; display:block;">
+
+            <h2 style="margin-top:12px; font-size:1.5rem; font-weight:bold; text-align:center;">{{ profile_user.username }}</h2>
+            <p style="color:#4B5563; text-align:center;">Player</p>
+            <p style="margin-top:8px; font-weight:600; color:#374151; text-align:center;">Coins: {{ profile_user.coins }}</p>
+
+            {% if g.user.id == profile_user.id %}
+            <form method="POST" action="{{ url_for('update_avatar') }}">
+                <h3 style="margin-top:16px; font-size:1.125rem; font-weight:600;">Välj Avatar</h3>
+
+                <div class="avatar-container">
+                    {% set avatars = ['profile1.png','profile2.png','profile3.png','profile4.png','profile5.png'] %}
+
+                    {% for avatar in avatars %}
+                    <label class="avatar-label">
+                        <input type="radio" name="avatar" value="{{ avatar }}" {% if profile_user.avatar == avatar %}checked{% endif %}>
+                        <img src="{{ url_for('static', filename='avatars/' ~ avatar) }}" alt="Avatar {{ loop.index }}">
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <button type="submit" class="avatar-button">Spara Avatar</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Right column: User info + highscores -->
+        <div style="flex:2 1 400px; background:#f9fafb; padding:16px; border-radius:12px;">
+            <!-- User info -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div><strong>Username:</strong></div>
+                <div>{{ profile_user.username }}</div>
+
+                <div><strong>Created:</strong></div>
+                <div>{{ profile_user.created_at|datetimeformat("%Y-%m-%d") }}</div>
+
+                <div><strong>Coins:</strong></div>
+                <div>{{ profile_user.coins }}</div>
+            </div>
+
+            <!-- Highscores -->
+            <div style="margin-top:16px;">
+                <h3 style="font-size:1.25rem; font-weight:600;">Highscores</h3>
+
+                {% set games = [
+                    {'name':'Snake','score':snake_highscore,'percent':snake_percent,'color':'#22C55E'},
+                    {'name':'FlappyBird','score':flappy_highscore,'percent':flappy_percent,'color':'#3B82F6'},
+                    {'name':'Dino','score':dino_highscore,'percent':dino_percent,'color':'#FACC15'}
+                ] %}
+
+                {% for game in games %}
+                <div style="margin-top:8px;">
+                    <span style="font-weight:500;">{{ game.name }}:</span>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width:{{ game.percent }}%; background:{{ game.color }};"></div>
+                    </div>
+                    <span style="font-size:0.875rem;">{{ game.score }} points</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

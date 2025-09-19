@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Flappy Bird - Spela och tjäna coins!</h1>
+<h1>Flappy Bird!</h1>
 
 <p>Ditt saldo: <strong>{{ user.coins }} coins</strong></p>
 
@@ -14,17 +14,39 @@
 <button id="startBtn">Starta spelet</button>
 <p id="gameMessage" style="color: red; font-weight: bold; margin-top: 10px;"></p>
 
-<h2>Leaderboard - High Score</h2>
-{% if highscore_list %}
-<ol>
-{% for username, high in highscore_list %}
-    <li>{{ username }} — {{ high }} coins</li>
-{% endfor %}
-</ol>
-{% else %}
-<p>Inga poäng registrerade än.</p>
-{% endif %}
+<!-- 🏆 Daily leaderboard -->
+<h3>🏆 Dagens Highscores</h3>
+<table class="table table-striped">
+  <thead>
+    <tr><th>Rank</th><th>Player</th><th>Score</th></tr>
+  </thead>
+  <tbody>
+    {% for entry in today_highscore %}
+    <tr {% if entry.username == user.username %}class="table-success"{% endif %}>
+      <td>{{ loop.index }}</td>
+      <td>{{ entry.username }}</td>
+      <td>{{ entry.high }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
+<!-- 🌍 All-time leaderboard -->
+<h3>🌍 All-Time Highscores</h3>
+<table class="table table-striped">
+  <thead>
+    <tr><th>Rank</th><th>Player</th><th>Score</th></tr>
+  </thead>
+  <tbody>
+    {% for entry in alltime_highscore %}
+    <tr {% if entry.username == user.username %}class="table-success"{% endif %}>
+      <td>{{ loop.index }}</td>
+      <td>{{ entry.username }}</td>
+      <td>{{ entry.high }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');

@@ -54,6 +54,9 @@ class User(db.Model):
     received_transactions = db.relationship('Transaction', foreign_keys='Transaction.receiver_id', backref='receiver', lazy=True)
     messages = db.relationship('Message', backref='user', lazy=True)
     snake_scores = db.relationship('SnakeScore', backref='user', lazy=True)
+    flappy_scores = db.relationship('FlappyScore', backref='user', lazy=True)  # ADD THIS
+    dino_scores = db.relationship('DinoScore', backref='user', lazy=True)
+    avatar = db.Column(db.String(255), nullable=True)
     #ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
 
     def set_password(self, password):
@@ -84,6 +87,14 @@ class SnakeReward(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, unique=True, nullable=False)
     distributed = db.Column(db.Boolean, default=False)
+
+def get_user_highscores(user_id):
+    return {
+        'snake': db.session.query(func.max(SnakeScore.score)).filter(SnakeScore.user_id == user_id).scalar() or 0,
+        'flappy': db.session.query(func.max(FlappyScore.score)).filter(FlappyScore.user_id == user_id).scalar() or 0,
+        'dino': db.session.query(func.max(DinoScore.score)).filter(DinoScore.user_id == user_id).scalar() or 0
+    }
+
 
 # Login required decorator
 def login_required(f):
@@ -368,7 +379,35 @@ def snake_submit():
 @app.route('/stats')
 @login_required
 def stats():
-    return render_template('stats.html')
+    user = g.user
+
+    # Snake highscore
+    snake_highscore = db.session.query(func.max(SnakeScore.score)).filter(
+        SnakeScore.user_id == user.id
+    ).scalar() or 0
+
+    # FlappyBird highscore
+    flappy_highscore = db.session.query(func.max(FlappyScore.score)).filter(
+        FlappyScore.user_id == user.id
+    ).scalar() or 0
+
+    # Dino highscore
+    dino_highscore = db.session.query(func.max(DinoScore.score)).filter(
+        DinoScore.user_id == user.id
+    ).scalar() or 0
+
+    return render_template(
+        "stats.html",
+        user=user,
+        snake_highscore=snake_highscore,
+        flappy_highscore=flappy_highscore,
+        dino_highscore=dino_highscore
+    )
+
+
+
+
+
 
 
 class MarketplaceItem(db.Model):
@@ -610,53 +649,92 @@ class FlappyScore(db.Model):
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
-    user = db.relationship('User', backref='flappy_scores')
+class FlappyReward(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, unique=True, nullable=False)
+    distributed = db.Column(db.Boolean, default=False)
 
-@app.route("/flappy")
+
+@app.route('/flappy')
 @login_required
 def flappy():
-    # Get all-time highscore leaderboard
-    highscore_list = (
-        db.session.query(User.username, func.max(FlappyScore.score).label("high"))
+    today = date.today()
+
+    today_highscore = (
+        db.session.query(User.username, func.max(FlappyScore.score).label('high'))
         .join(FlappyScore)
+        .filter(FlappyScore.date == today)
         .group_by(User.id)
         .order_by(func.max(FlappyScore.score).desc())
+        .limit(10)
         .all()
     )
 
-    # Get user all-time highscore
-    user_highscore = (
-        db.session.query(func.max(FlappyScore.score))
-        .filter(FlappyScore.user_id == g.user.id)
-        .scalar()
-        or 0
+    alltime_highscore = (
+        db.session.query(User.username, func.max(FlappyScore.score).label('high'))
+        .join(FlappyScore)
+        .group_by(User.id)
+        .order_by(func.max(FlappyScore.score).desc())
+        .limit(10)
+        .all()
     )
 
+    user_highscore = db.session.query(func.max(FlappyScore.score)).filter(
+        FlappyScore.user_id == g.user.id
+    ).scalar() or 0
+
     return render_template(
-        "flappy.html",
+        'flappy.html',
+        today_highscore=today_highscore,
+        alltime_highscore=alltime_highscore,
         user=g.user,
-        highscore_list=highscore_list,
         user_highscore=user_highscore
     )
 
-@app.route("/flappy/submit", methods=["POST"])
+
+@app.route('/flappy/submit', methods=['POST'])
 @login_required
 def flappy_submit():
     data = request.get_json()
-    score = data.get("score")
-
+    score = data.get('score')
     if not isinstance(score, int) or score < 0:
-        return jsonify({"error": "Invalid score"}), 400
+        return jsonify({'error': 'Invalid score'}), 400
 
     today = date.today()
 
-    # Save score in DB
-    new_score = FlappyScore(user_id=g.user.id, score=score, date=today)
-    g.user.coins += score  # 1 coin per score
-    db.session.add(new_score)
-    db.session.commit()
+    exists = FlappyScore.query.filter_by(user_id=g.user.id, date=today).first()
+    if not exists:
+        new_score = FlappyScore(user_id=g.user.id, score=score, date=today)
+        db.session.add(new_score)
+        db.session.commit()
 
-    return jsonify({"message": "Score saved", "score": score, "coins": g.user.coins})
+    reward_entry = FlappyReward.query.filter_by(date=today).first()
+    if not reward_entry:
+        reward_entry = FlappyReward(date=today, distributed=False)
+        db.session.add(reward_entry)
+        db.session.commit()
+
+    if not reward_entry.distributed:
+        top_player = (
+            db.session.query(User, func.max(FlappyScore.score).label('high'))
+            .join(FlappyScore)
+            .filter(FlappyScore.date == today)
+            .group_by(User.id)
+            .order_by(func.max(FlappyScore.score).desc())
+            .first()
+        )
+        if top_player:
+            winner, highscore = top_player
+            winner.coins += 1000
+            reward_entry.distributed = True
+            db.session.commit()
+
+    highscore = db.session.query(func.max(FlappyScore.score)).filter(
+        FlappyScore.user_id == g.user.id
+    ).scalar()
+
+    return jsonify({'message': 'Score saved', 'highscore': highscore})
+
 
 
 from datetime import datetime, timedelta, date
@@ -849,7 +927,7 @@ def bank():
 @app.route('/admin/close-day', methods=['POST', 'GET'])
 @login_required
 def close_day():
- 
+
     today = date.today()
 
     # Always recalculate rewards fresh
@@ -972,11 +1050,30 @@ class DinoScore(db.Model):
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
+class DinoReward(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, unique=True, nullable=False)
+    distributed = db.Column(db.Boolean, default=False)
+
+
 @app.route('/dino')
 @login_required
 def dino():
-    # Leaderboard: top highscores
-    leaderboard = (
+    today = date.today()
+
+    # --- Daily leaderboard (top highscores today) ---
+    today_highscore = (
+        db.session.query(User.username, func.max(DinoScore.score).label('high'))
+        .join(DinoScore)
+        .filter(DinoScore.date == today)
+        .group_by(User.id)
+        .order_by(func.max(DinoScore.score).desc())
+        .limit(10)
+        .all()
+    )
+
+    # --- All-time leaderboard (top highscores ever) ---
+    alltime_highscore = (
         db.session.query(User.username, func.max(DinoScore.score).label('high'))
         .join(DinoScore)
         .group_by(User.id)
@@ -985,16 +1082,19 @@ def dino():
         .all()
     )
 
+    # user’s personal highscore
     user_highscore = db.session.query(func.max(DinoScore.score)).filter(
         DinoScore.user_id == g.user.id
     ).scalar() or 0
 
     return render_template(
         'dino.html',
-        leaderboard=leaderboard,
+        today_highscore=today_highscore,
+        alltime_highscore=alltime_highscore,
         user=g.user,
         user_highscore=user_highscore
     )
+
 
 @app.route('/dino/submit', methods=['POST'])
 @login_required
@@ -1005,16 +1105,113 @@ def dino_submit():
         return jsonify({'error': 'Invalid score'}), 400
 
     today = date.today()
+
+    # Save the score
     new_score = DinoScore(user_id=g.user.id, score=score, date=today)
     db.session.add(new_score)
     db.session.commit()
 
-    # update highscore
+    # --- Check if daily reward is already distributed ---
+    reward_entry = DinoReward.query.filter_by(date=today).first()
+    if not reward_entry:
+        reward_entry = DinoReward(date=today, distributed=False)
+        db.session.add(reward_entry)
+        db.session.commit()
+
+    if not reward_entry.distributed:
+        # Find today’s top score
+        top_player = (
+            db.session.query(User, func.max(DinoScore.score).label('high'))
+            .join(DinoScore)
+            .filter(DinoScore.date == today)
+            .group_by(User.id)
+            .order_by(func.max(DinoScore.score).desc())
+            .first()
+        )
+
+        if top_player:
+            winner, highscore = top_player
+            winner.coins += 1000
+            reward_entry.distributed = True
+            db.session.commit()
+
+    # Return updated personal highscore
     highscore = db.session.query(func.max(DinoScore.score)).filter(
         DinoScore.user_id == g.user.id
     ).scalar()
 
     return jsonify({'message': 'Score saved', 'highscore': highscore})
+
+@app.route('/profile/<username>')
+def profile(username):
+    profile_user = User.query.filter_by(username=username).first_or_404()
+
+    # Compute max scores for this user
+    snake_highscore = max((s.score for s in profile_user.snake_scores), default=0)
+    flappy_highscore = max((f.score for f in profile_user.flappy_scores), default=0)
+    dino_highscore = max((d.score for d in profile_user.dino_scores), default=0)
+
+    # Compute record scores across all users
+    snake_record = db.session.query(func.max(SnakeScore.score)).scalar() or 1
+    flappy_record = db.session.query(func.max(FlappyScore.score)).scalar() or 1
+    dino_record = db.session.query(func.max(DinoScore.score)).scalar() or 1
+
+    # Compute percentages
+    snake_percent = min(int(snake_highscore / snake_record * 100), 100)
+    flappy_percent = min(int(flappy_highscore / flappy_record * 100), 100)
+    dino_percent = min(int(dino_highscore / dino_record * 100), 100)
+
+    return render_template(
+        'profile.html',
+        profile_user=profile_user,
+        snake_highscore=snake_highscore,
+        flappy_highscore=flappy_highscore,
+        dino_highscore=dino_highscore,
+        snake_percent=snake_percent,
+        flappy_percent=flappy_percent,
+        dino_percent=dino_percent
+    )
+
+
+
+@app.route('/update_avatar', methods=['POST'])
+def update_avatar():
+    if not g.user:
+        return redirect(url_for('login'))
+
+    selected_avatar = request.form.get('avatar')
+    if selected_avatar:
+        # Save the new avatar in the database
+        user = g.user
+        # If you store just the filename
+        user.avatar = os.path.basename(selected_avatar)
+        db.session.commit()
+
+    return redirect(url_for('profile', username=g.user.username))
+
+
+
+@app.route('/admin/add-avatar-column')
+def add_avatar_column():
+    # Only admin can run
+    if not g.user or g.user.username != 'admin':
+        return "Unauthorized", 403
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    columns = [c['name'] for c in inspector.get_columns('user')]
+
+    if 'avatar' in columns:
+        return "'avatar' column already exists!"
+
+    # Modern SQLAlchemy: use a connection context
+    with db.engine.begin() as conn:
+        conn.execute(text("ALTER TABLE user ADD COLUMN avatar TEXT DEFAULT 'avatar1.png';"))
+
+    return "'avatar' column added successfully!"
+
+
 
 
 if __name__ == '__main__':
