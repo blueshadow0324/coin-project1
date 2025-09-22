@@ -76,6 +76,8 @@ class User(db.Model):
     flappy_scores = db.relationship('FlappyScore', backref='user', lazy=True)  # ADD THIS
     dino_scores = db.relationship('DinoScore', backref='user', lazy=True)
     avatar = db.Column(db.String(255), nullable=True)
+    #real_name = db.Column(db.String(120), nullable=True)
+    #is_verified = db.Column(db.Boolean, default=False)
     #ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
 
     def set_password(self, password):
@@ -1171,11 +1173,130 @@ def update_avatar():
 
     return redirect(url_for('profile', username=g.user.username))
 
+class Party(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), unique=True, nullable=False)
+    founder_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    founder = db.relationship('User', backref='founded_parties')
+    votes = db.relationship('Vote', backref='party', lazy=True)
+
+class Vote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    party_id = db.Column(db.Integer, db.ForeignKey('party.id'), nullable=False)
+    week_start = db.Column(db.Date, nullable=False)  # Monday of the voting week
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='votes')
 
 
-@app.route('/admin/add-avatar-column')
-def add_avatar_column():
-    db.create_all()
+def calculate_riksdag_seats():
+    total_votes = db.session.query(func.count(Vote.id)).scalar() or 0
+    if total_votes == 0:
+        return []
+
+    party_votes = (
+        db.session.query(Party.name, func.count(Vote.id).label("votes"))
+        .outerjoin(Vote)
+        .group_by(Party.id)
+        .all()
+    )
+
+    results = []
+    for party_name, votes in party_votes:
+        seats = round((votes / total_votes) * 49)  # 49 seats total
+        results.append({"party": party_name, "votes": votes, "seats": seats})
+
+    return results
+
+@app.route('/party/create', methods=['GET', 'POST'])
+@login_required
+def create_party():
+    if request.method == 'POST':
+        name = request.form.get('name')  # <--- works with HTML forms
+
+        if not name:
+            flash("Party name required", "danger")
+            return redirect(url_for('create_party'))
+
+        if g.user.coins < 1000:
+            flash("Not enough coins (1000 required)", "danger")
+            return redirect(url_for('create_party'))
+
+        if Party.query.filter_by(name=name).first():
+            flash("Party already exists", "danger")
+            return redirect(url_for('create_party'))
+
+        new_party = Party(name=name, founder_id=g.user.id)
+        db.session.add(new_party)
+        g.user.coins -= 1000
+        db.session.commit()
+
+        flash(f"Party '{name}' created!", "success")
+        return redirect(url_for('vote'))
+
+    return render_template("create_party.html")
+
+
+@app.route('/vote', methods=['GET', 'POST'])
+@login_required
+def vote():
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+
+    if request.method == 'POST':
+        # TEMP bypass verification for local testing
+        # if not g.user.is_verified:
+        #     flash("You must be verified to vote!", "danger")
+        #     return redirect(url_for('vote'))
+
+        party_id = request.form.get('party_id')
+        if not party_id:
+            flash("Please select a party", "danger")
+            return redirect(url_for('vote'))
+
+        existing_vote = Vote.query.filter_by(user_id=g.user.id, week_start=week_start).first()
+        if existing_vote:
+            flash("You already voted this week!", "warning")
+            return redirect(url_for('vote'))
+
+        new_vote = Vote(user_id=g.user.id, party_id=party_id, week_start=week_start)
+        db.session.add(new_vote)
+        db.session.commit()
+
+        flash("Vote submitted!", "success")
+        return redirect(url_for('vote'))
+
+    parties = Party.query.all()
+    return render_template("vote.html", parties=parties)
+
+
+@app.route('/admin/end_vote', methods=['POST'])
+@login_required
+def end_vote():
+    if g.user.username != ADMIN_USERNAME:
+        flash("Admins only!", "danger")
+        return redirect(url_for('riksdag'))
+
+    # Calculate results and clear votes for next week
+    results = calculate_riksdag_seats()
+
+    # Clear votes after calculation
+    db.session.query(Vote).delete()
+    db.session.commit()
+
+    flash("Voting ended. Results have been calculated!", "info")
+    return render_template("riksdag.html", results=results)
+
+
+
+@app.route('/riksdag')
+def riksdag():
+    results = calculate_riksdag_seats()
+    return render_template("riksdag.html", results=results)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)

@@ -1,0 +1,22 @@
+<h2>Riksdag Results</h2>
+
+{% if results %}
+<table border="1">
+  <tr><th>Party</th><th>Votes</th><th>Seats</th></tr>
+  {% for row in results %}
+    <tr>
+      <td>{{ row.party }}</td>
+      <td>{{ row.votes }}</td>
+      <td>{{ row.seats }}</td>
+    </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No results yet.</p>
+{% endif %}
+
+{% if g.user.is_admin %}
+<form method="post" action="{{ url_for('end_vote') }}">
+  <button type="submit">End Vote</button>
+</form>
+{% endif %}
