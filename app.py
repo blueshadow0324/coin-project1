@@ -662,33 +662,34 @@ class FlappyScore(db.Model):
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
-class FlappyReward(db.Model):
+# --- Models ---
+class FlappyScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, unique=True, nullable=False)
-    distributed = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
 
 
-@app.route('/flappy')
+# --- Flappy leaderboard page ---
+@app.route('/flappy', methods=['GET'])
 @login_required
 def flappy():
     today = date.today()
 
     today_highscore = (
-        db.session.query(User.username, func.max(FlappyScore.score).label('high'))
+        db.session.query(User.username, func.max(FlappyScore.score).label('highscore'))
         .join(FlappyScore)
         .filter(FlappyScore.date == today)
         .group_by(User.id)
         .order_by(func.max(FlappyScore.score).desc())
-        .limit(10)
         .all()
     )
 
     alltime_highscore = (
-        db.session.query(User.username, func.max(FlappyScore.score).label('high'))
+        db.session.query(User.username, func.max(FlappyScore.score).label('highscore'))
         .join(FlappyScore)
         .group_by(User.id)
         .order_by(func.max(FlappyScore.score).desc())
-        .limit(10)
         .all()
     )
 
@@ -705,49 +706,28 @@ def flappy():
     )
 
 
+# --- Submit flappy score ---
 @app.route('/flappy/submit', methods=['POST'])
 @login_required
 def flappy_submit():
     data = request.get_json()
     score = data.get('score')
+
     if not isinstance(score, int) or score < 0:
         return jsonify({'error': 'Invalid score'}), 400
 
     today = date.today()
 
-    exists = FlappyScore.query.filter_by(user_id=g.user.id, date=today).first()
-    if not exists:
-        new_score = FlappyScore(user_id=g.user.id, score=score, date=today)
-        db.session.add(new_score)
-        db.session.commit()
+    # Save the new score (do not overwrite so highscores track properly)
+    new_score = FlappyScore(user_id=g.user.id, score=score, date=today)
+    db.session.add(new_score)
 
-    reward_entry = FlappyReward.query.filter_by(date=today).first()
-    if not reward_entry:
-        reward_entry = FlappyReward(date=today, distributed=False)
-        db.session.add(reward_entry)
-        db.session.commit()
+    # Reward 1 coin per score
+    g.user.coins += score
 
-    if not reward_entry.distributed:
-        top_player = (
-            db.session.query(User, func.max(FlappyScore.score).label('high'))
-            .join(FlappyScore)
-            .filter(FlappyScore.date == today)
-            .group_by(User.id)
-            .order_by(func.max(FlappyScore.score).desc())
-            .first()
-        )
-        if top_player:
-            winner, highscore = top_player
-            winner.coins += 1000
-            reward_entry.distributed = True
-            db.session.commit()
+    db.session.commit()
 
-    highscore = db.session.query(func.max(FlappyScore.score)).filter(
-        FlappyScore.user_id == g.user.id
-    ).scalar()
-
-    return jsonify({'message': 'Score saved', 'highscore': highscore})
-
+    return jsonify({'message': 'Score saved', 'score': score, 'coins': g.user.coins})
 
 
 from datetime import datetime, timedelta, date
