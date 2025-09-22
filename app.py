@@ -76,8 +76,8 @@ class User(db.Model):
     flappy_scores = db.relationship('FlappyScore', backref='user', lazy=True)  # ADD THIS
     dino_scores = db.relationship('DinoScore', backref='user', lazy=True)
     avatar = db.Column(db.String(255), nullable=True)
-    #real_name = db.Column(db.String(120), nullable=True)
-    #is_verified = db.Column(db.Boolean, default=False)
+    real_name = db.Column(db.String(120), nullable=True)
+    is_verified = db.Column(db.Boolean, default=False)
     #ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
 
     def set_password(self, password):
