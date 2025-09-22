@@ -1,0 +1,12 @@
+<h2>Pending Verification Requests</h2>
+<ul>
+{% for user in pending_users %}
+  <li>{{ user.username }} - {{ user.real_name }}
+      <form method="post" action="{{ url_for('admin_approve', user_id=user.id) }}">
+          <button type="submit">Approve</button>
+      </form>
+  </li>
+{% else %}
+  <li>No pending requests</li>
+{% endfor %}
+</ul>

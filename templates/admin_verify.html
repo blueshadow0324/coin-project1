@@ -1,0 +1,42 @@
+<!-- templates/admin_verify.html -->
+{% extends "base.html" %}
+
+{% block title %}Pending Verification Requests{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-2xl mt-10 p-6 bg-white shadow rounded-lg">
+    <h2 class="text-2xl font-bold mb-4">Pending Verification Requests</h2>
+
+    {% if pending_users %}
+        <table class="w-full table-auto border-collapse border border-gray-200">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="border px-4 py-2">Username</th>
+                    <th class="border px-4 py-2">Real Name</th>
+                    <th class="border px-4 py-2">Requested At</th>
+                    <th class="border px-4 py-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in pending_users %}
+                <tr>
+                    <td class="border px-4 py-2">{{ user.username }}</td>
+                    <td class="border px-4 py-2">{{ user.real_name }}</td>
+                    <td class="border px-4 py-2">{{ user.verification_request_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td class="border px-4 py-2">
+                        <form action="{{ url_for('admin_approve', user_id=user.id) }}" method="POST">
+                            <button type="submit"
+                                    class="bg-green-500 hover:bg-green-600 text-white py-1 px-3 rounded">
+                                Approve
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-gray-700">No pending verification requests.</p>
+    {% endif %}
+</div>
+{% endblock %}

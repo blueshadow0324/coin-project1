@@ -1,0 +1,33 @@
+<!-- templates/verify.html -->
+{% extends "base.html" %}
+
+{% block title %}Verify Your Account{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-lg mt-10 p-6 bg-white shadow rounded-lg">
+    <h2 class="text-2xl font-bold mb-4">Account Verification</h2>
+
+    {% if g.user.is_verified %}
+        <p class="text-green-600 font-semibold">✅ Your account is verified! You can now vote.</p>
+        <a href="{{ url_for('vote') }}" class="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded">
+            Go Vote
+        </a>
+    {% else %}
+        {% if g.user.verification_request_at %}
+            <p class="text-yellow-600 font-semibold">⚠️ Verification request submitted on {{ g.user.verification_request_at.strftime('%Y-%m-%d %H:%M') }}.</p>
+            <p>Please wait for admin approval. You cannot vote until verified.</p>
+        {% else %}
+            <p class="text-gray-700">You must verify your real name before voting.</p>
+            <form method="post" action="{{ url_for('verify') }}">
+                <label for="real_name" class="block text-gray-700 mt-4">Enter your real name:</label>
+                <input type="text" name="real_name" id="real_name" required
+                       class="w-full mt-2 p-2 border rounded">
+                <button type="submit"
+                        class="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded">
+                    Request Verification
+                </button>
+            </form>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

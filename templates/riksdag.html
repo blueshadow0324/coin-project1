@@ -1,22 +1,49 @@
-<h2>Riksdag Results</h2>
+{% extends "base.html" %}
+{% block title %}Riksdag Seating{% endblock %}
 
-{% if results %}
-<table border="1">
-  <tr><th>Party</th><th>Votes</th><th>Seats</th></tr>
-  {% for row in results %}
-    <tr>
-      <td>{{ row.party }}</td>
-      <td>{{ row.votes }}</td>
-      <td>{{ row.seats }}</td>
-    </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p>No results yet.</p>
-{% endif %}
+{% block content %}
+<h1>Riksdag Seating</h1>
 
-{% if g.user.is_admin %}
-<form method="post" action="{{ url_for('end_vote') }}">
-  <button type="submit">End Vote</button>
-</form>
-{% endif %}
+<div class="riksdag">
+    {% for party in results %}
+        {% for i in range(party.seats) %}
+            <span class="seat" style="background-color: #{{ party.color }}"></span>
+        {% endfor %}
+    {% endfor %}
+</div>
+
+<h2>Results</h2>
+<ul>
+    {% for party in results %}
+        <li>{{ party.party }}: {{ party.votes }} votes, {{ party.seats }} seats</li>
+    {% endfor %}
+</ul>
+
+<style>
+.riksdag {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+    width: 600px;
+    margin: 0 auto;
+    transform: rotate(180deg);
+}
+
+.seat {
+    width: 18px;
+    height: 18px;
+    margin: 2px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Optional: row spacing */
+.row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+</style>
+
+{% endblock %}

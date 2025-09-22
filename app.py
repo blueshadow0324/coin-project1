@@ -51,6 +51,11 @@ with app.app_context():
             conn.execute(
                 text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;')
             )
+    if "verification_request_at" not in columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text('ALTER TABLE "user" ADD COLUMN verification_request_at DATETIME;')
+            )
 
 
 from datetime import datetime, date
@@ -96,6 +101,7 @@ class User(db.Model):
     avatar = db.Column(db.String(255), nullable=True)
     real_name = db.Column(db.String(120), nullable=True)
     is_verified = db.Column(db.Boolean, default=False)
+    verification_request_at = db.Column(db.DateTime, nullable=True)
     #ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
 
     def set_password(self, password):
@@ -1197,18 +1203,23 @@ class Party(db.Model):
     founder_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    founder = db.relationship('User', backref='founded_parties')
-    votes = db.relationship('Vote', backref='party', lazy=True)
-
 class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     party_id = db.Column(db.Integer, db.ForeignKey('party.id'), nullable=False)
-    week_start = db.Column(db.Date, nullable=False)  # Monday of the voting week
+    week_start = db.Column(db.Date, nullable=False)  # Thursday start of week
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', backref='votes')
 
+PARTY_COLORS = {
+    "red": "e74c3c",
+    "green": "27ae60",
+    "blue": "3498db",
+    "yellow": "f1c40f",
+    "brown": "8e44ad",
+    # fallback color
+    "default": "7f8c8d"
+}
 
 def calculate_riksdag_seats():
     total_votes = db.session.query(func.count(Vote.id)).scalar() or 0
@@ -1224,10 +1235,17 @@ def calculate_riksdag_seats():
 
     results = []
     for party_name, votes in party_votes:
-        seats = round((votes / total_votes) * 49)  # 49 seats total
-        results.append({"party": party_name, "votes": votes, "seats": seats})
-
+        seats = round((votes / total_votes) * 49)  # total seats = 49
+        color_key = party_name.lower()
+        color = PARTY_COLORS.get(color_key, PARTY_COLORS["default"])
+        results.append({
+            "party": party_name,
+            "votes": votes,
+            "seats": seats,
+            "color": color
+        })
     return results
+
 
 @app.route('/party/create', methods=['GET', 'POST'])
 @login_required
@@ -1258,37 +1276,81 @@ def create_party():
     return render_template("create_party.html")
 
 
+# vote.py route
 @app.route('/vote', methods=['GET', 'POST'])
 @login_required
 def vote():
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())
+    # Thursday = 3, Friday = 4
+    if today.weekday() not in [0, 4]:
+        flash("Röstning bara öppen Torsdag och Fredag!", "danger")
+        return redirect(url_for("dashboard"))
+
+    # Check if user is verified
+    if not g.user.is_verified:
+        # If user has never requested verification, set timestamp
+        if not g.user.verification_request_at:
+            g.user.verification_request_at = datetime.utcnow()
+            db.session.commit()
+            flash("You must verify your real name before voting! Verification request submitted.", "warning")
+        else:
+            flash("You must verify your real name before voting! Verification pending.", "warning")
+        return redirect(url_for('verify'))
+
+    # Determine start of current week (Thursday)
+    # Assuming week_start for voting is Thursday
+    # If today is Thursday or Friday, week_start = Thursday of this week
+    weekday_offset = (today.weekday() - 3) % 7  # 3 = Thursday
+    week_start = today - timedelta(days=weekday_offset)
 
     if request.method == 'POST':
-        # TEMP bypass verification for local testing
-        # if not g.user.is_verified:
-        #     flash("You must be verified to vote!", "danger")
-        #     return redirect(url_for('vote'))
-
         party_id = request.form.get('party_id')
         if not party_id:
             flash("Please select a party", "danger")
             return redirect(url_for('vote'))
 
+        # Check if user already voted this week
         existing_vote = Vote.query.filter_by(user_id=g.user.id, week_start=week_start).first()
         if existing_vote:
             flash("You already voted this week!", "warning")
             return redirect(url_for('vote'))
 
+        # Record new vote
         new_vote = Vote(user_id=g.user.id, party_id=party_id, week_start=week_start)
         db.session.add(new_vote)
         db.session.commit()
-
         flash("Vote submitted!", "success")
         return redirect(url_for('vote'))
 
+    # GET request: show all parties
     parties = Party.query.all()
     return render_template("vote.html", parties=parties)
+
+@app.route('/admin/verify-requests')
+@login_required
+def admin_verify_requests():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    pending_users = User.query.filter(
+        User.is_verified == False,
+        User.verification_request_at.isnot(None)
+    ).all()
+
+    return render_template("admin_verify.html", pending_users=pending_users)
+
+
+@app.route('/admin/approve/<int:user_id>', methods=['POST'])
+@login_required
+def admin_approve(user_id):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    user = User.query.get_or_404(user_id)
+    user.is_verified = True
+    db.session.commit()
+    flash(f"{user.username} has been verified.", "success")
+    return redirect(url_for('admin_verify_requests'))
 
 
 @app.route('/admin/end_vote', methods=['POST'])
@@ -1308,6 +1370,17 @@ def end_vote():
     flash("Voting ended. Results have been calculated!", "info")
     return render_template("riksdag.html", results=results)
 
+@app.route('/verify', methods=['GET', 'POST'])
+@login_required
+def verify():
+    if request.method == 'POST':
+        g.user.real_name = request.form.get('real_name')
+        g.user.verification_request_at = datetime.utcnow()
+        db.session.commit()
+        flash("Verification request submitted!", "success")
+        return redirect(url_for('dashboard'))
+
+    return render_template("verify.html")
 
 
 @app.route('/riksdag')
