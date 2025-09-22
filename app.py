@@ -35,6 +35,24 @@ ALLOWED_EXTENSIONS = {"db"}
 
 db = SQLAlchemy(app)
 
+from sqlalchemy import inspect, text
+
+with app.app_context():
+    inspector = inspect(db.engine)
+    columns = [col['name'] for col in inspector.get_columns("user")]
+
+    if "real_name" not in columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text('ALTER TABLE "user" ADD COLUMN real_name VARCHAR(120);')
+            )
+    if "is_verified" not in columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;')
+            )
+
+
 from datetime import datetime, date
 from sqlalchemy import inspect, text
 
