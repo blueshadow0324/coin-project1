@@ -418,11 +418,6 @@ def stats():
     )
 
 
-
-
-
-
-
 class MarketplaceItem(db.Model):
     __tablename__ = "marketplace_items"
 
@@ -657,8 +652,8 @@ from datetime import date, timedelta
 from sqlalchemy import func
 
 class FlappyScore(db.Model):
-     __tablename__ = "flappy_scores"
- 
+    __tablename__ = "flappy_scores"   # make sure this line is aligned under class
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     score = db.Column(db.Integer, nullable=False)
