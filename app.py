@@ -53,8 +53,9 @@ with app.app_context():
             )
     if "verification_request_at" not in columns:
         with db.engine.begin() as conn:
+            # <-- Change DATETIME to TIMESTAMP for Postgres
             conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN verification_request_at DATETIME;')
+                text('ALTER TABLE "user" ADD COLUMN verification_request_at TIMESTAMP;')
             )
 
 
