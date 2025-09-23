@@ -1307,8 +1307,8 @@ def create_party():
 def vote():
     today = date.today()
     # Thursday = 3, Friday = 4
-    if today.weekday() not in [3, 4]:
-        flash("Röstning bara öppen Torsdag och Fredag!", "danger")
+    if today.weekday() not in [2, 3]:
+        flash("Röstning bara öppen Onsdag och Torsdag!", "danger")
         return redirect(url_for("dashboard"))
 
     # Check if user is verified
