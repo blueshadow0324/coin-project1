@@ -37,6 +37,22 @@ ALLOWED_EXTENSIONS = {"db"}
 
 db = SQLAlchemy(app)
 
+# in your app.py
+from flask import Flask
+from datetime import datetime
+
+app = Flask(__name__)
+
+# Custom filter
+@app.template_filter('datetimeformat')
+def datetimeformat(value, format='%Y-%m-%d %H:%M'):
+    if isinstance(value, datetime):
+        return value.strftime(format)
+    return value
+
+# Example usage in Jinja2 template:
+# {{ user.created_at|datetimeformat('%d/%m/%Y') }}
+
 # --------------------
 # Models
 # --------------------
