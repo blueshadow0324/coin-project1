@@ -1203,13 +1203,23 @@ class Party(db.Model):
     name = db.Column(db.String(120), unique=True, nullable=False)
     founder_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Track coalition government
+    is_in_government = db.Column(db.Boolean, default=False)
 
 class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     party_id = db.Column(db.Integer, db.ForeignKey('party.id'), nullable=False)
-    week_start = db.Column(db.Date, nullable=False)  # Thursday start of week
+    week_start = db.Column(db.Date, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Bill(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200))
+    content = db.Column(db.Text)
+    proposer_party_id = db.Column(db.Integer, db.ForeignKey('party.id'))
+    passed = db.Column(db.Boolean, default=False)
+
 
 
 PARTY_COLORS = {
@@ -1233,6 +1243,18 @@ def calculate_riksdag_seats():
         .group_by(Party.id)
         .all()
     )
+
+    results = []
+    for party_id, party_name, votes in party_votes:
+        seats = round((votes / total_votes) * 349)  # Swedish Riksdag has 349 seats
+        results.append({
+            "id": party_id,
+            "party": party_name,
+            "votes": votes,
+            "seats": seats
+        })
+    return results
+
 
     results = []
     for party_id, party_name, votes in party_votes:
