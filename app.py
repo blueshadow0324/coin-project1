@@ -1465,5 +1465,91 @@ def riksdag_coalition():
     )
 
 
+
+def form_government(selected_parties_ids):
+    results = calculate_riksdag_seats()
+    total_seats = sum([p["seats"] for p in results])
+    selected_seats = sum([p["seats"] for p in results if p["id"] in selected_parties_ids])
+
+    if selected_seats / total_seats < 0.5:
+        return False, "Not enough seats for a majority. Coalition required!"
+
+    # Mark parties as in government
+    for party_id in selected_parties_ids:
+        party = Party.query.get(party_id)
+        party.is_in_government = True
+    db.session.commit()
+    return True, "Government formed successfully!"
+
+def vote_on_bill(bill_id, votes_dict):
+    """
+    votes_dict = {party_id: 'yes'/'no'/'abstain'}
+    """
+    bill = Bill.query.get(bill_id)
+    results = calculate_riksdag_seats()
+    total_seats = sum([p["seats"] for p in results])
+    yes_seats = sum([p["seats"] for p in results if votes_dict.get(p["id"]) == "yes"])
+
+    if yes_seats > total_seats / 2:
+        bill.passed = True
+    else:
+        bill.passed = False
+    db.session.commit()
+    return bill.passed
+
+class Constitution(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    proposed_by_party_id = db.Column(db.Integer, db.ForeignKey('party.id'))
+    first_vote_passed = db.Column(db.Boolean, default=False)
+    final_vote_passed = db.Column(db.Boolean, default=False)
+    first_vote_date = db.Column(db.DateTime)
+    final_vote_date = db.Column(db.DateTime)
+
+from datetime import datetime, timedelta
+
+def propose_constitution_change(title, content, proposer_party_id):
+    new_const = Constitution(
+        title=title,
+        content=content,
+        proposed_by_party_id=proposer_party_id,
+        first_vote_date=datetime.utcnow()
+    )
+    db.session.add(new_const)
+    db.session.commit()
+    return new_const
+
+def vote_constitution_first(const_id, votes_dict):
+    const = Constitution.query.get(const_id)
+    results = calculate_riksdag_seats()
+    total_seats = sum([p["seats"] for p in results])
+    yes_seats = sum([p["seats"] for p in results if votes_dict.get(p["id"]) == "yes"])
+
+    if yes_seats > total_seats / 2:
+        const.first_vote_passed = True
+        const.final_vote_date = const.first_vote_date + timedelta(days=7)  # waiting period
+    db.session.commit()
+    return const.first_vote_passed
+
+def vote_constitution_final(const_id, votes_dict):
+    const = Constitution.query.get(const_id)
+    if datetime.utcnow() < const.final_vote_date:
+        return False, "Final vote not yet open. Waiting period active."
+
+    results = calculate_riksdag_seats()
+    total_seats = sum([p["seats"] for p in results])
+    yes_seats = sum([p["seats"] for p in results if votes_dict.get(p["id"]) == "yes"])
+
+    if yes_seats > total_seats / 2:
+        const.final_vote_passed = True
+        db.session.commit()
+        return True, "Constitutional amendment passed!"
+    
+    const.final_vote_passed = False
+    db.session.commit()
+    return False, "Amendment failed in final vote."
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
