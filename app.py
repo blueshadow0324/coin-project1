@@ -57,7 +57,7 @@ with app.app_context():
             conn.execute(
                 text('ALTER TABLE "user" ADD COLUMN verification_request_at TIMESTAMP;')
             )
-     if "is_in_government" not in columns:
+    if "is_in_government" not in columns:
         with db.engine.begin() as conn:
             conn.execute(
                 text('ALTER TABLE "party" ADD COLUMN is_in_government BOOLEAN DEFAULT FALSE;')
