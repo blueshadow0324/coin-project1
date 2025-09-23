@@ -1409,6 +1409,39 @@ def admin_delete_party(party_id):
     flash(f"Party '{party.name}' has been deleted.", "info")
     return redirect(url_for('riksdag'))
 
+@app.route('/riksdag/coalition', methods=['GET', 'POST'])
+@login_required
+def riksdag_coalition():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    results = calculate_riksdag_seats()
+    total_seats = 49
+    majority = (total_seats // 2) + 1
+
+    if request.method == 'POST':
+        selected_party_ids = request.form.getlist('party_ids')  # list of party IDs
+        coalition = [p for p in results if str(p["id"]) in selected_party_ids]
+        seats_sum = sum(p["seats"] for p in coalition)
+        status = "majority" if seats_sum >= majority else "no_majority"
+        return render_template(
+            "riksdag_coalition.html",
+            results=results,
+            coalition=coalition,
+            seats_sum=seats_sum,
+            majority=majority,
+            status=status
+        )
+
+    return render_template(
+        "riksdag_coalition.html",
+        results=results,
+        coalition=[],
+        seats_sum=0,
+        majority=majority,
+        status=None
+    )
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
