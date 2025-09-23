@@ -41,8 +41,6 @@ db = SQLAlchemy(app)
 from flask import Flask
 from datetime import datetime
 
-app = Flask(__name__)
-
 # Custom filter
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format='%Y-%m-%d %H:%M'):
