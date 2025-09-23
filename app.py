@@ -1,14 +1,17 @@
- # app.py
+# app.py
 import os
 import json
 from datetime import datetime, date
 from functools import wraps
 import random
-from flask import Flask, render_template, request, redirect, url_for, session, flash, g, jsonify, send_file, abort
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    session, flash, g, jsonify, send_file, abort
+)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import backref
 import subprocess
 
@@ -23,10 +26,9 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_timeout": 30,    # seconds
     "pool_recycle": 1800   # recycle connections every 30 minutes
 }
+
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
- # --- Run app ---
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -35,109 +37,117 @@ ALLOWED_EXTENSIONS = {"db"}
 
 db = SQLAlchemy(app)
 
-from sqlalchemy import inspect, text
-
-with app.app_context():
-    inspector = inspect(db.engine)
-    columns = [col['name'] for col in inspector.get_columns("user")]
-
-    if "real_name" not in columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN real_name VARCHAR(120);')
-            )
-    if "is_verified" not in columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;')
-            )
-    if "verification_request_at" not in columns:
-        with db.engine.begin() as conn:
-            # <-- Change DATETIME to TIMESTAMP for Postgres
-            conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN verification_request_at TIMESTAMP;')
-            )
-    if "is_in_government" not in columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text('ALTER TABLE "party" ADD COLUMN is_in_government BOOLEAN DEFAULT FALSE;')
-            )
-
-
-from datetime import datetime, date
-from sqlalchemy import inspect, text
-
-with app.app_context():
-    inspector = inspect(db.engine)
-    columns = [col["name"] for col in inspector.get_columns("user")]
-
-    if "avatar" not in columns:  # Only add if missing
-        with db.engine.begin() as conn:
-            conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN avatar TEXT DEFAULT \'avatar1.png\';')
-            )
-
-
-@app.template_filter('datetimeformat')
-def datetimeformat(value, format="%Y-%m-%d %H:%M"):
-    try:
-        if value is None:
-            return "-"
-        if isinstance(value, str):
-            value = datetime.fromisoformat(value)
-        return value.strftime(format)
-    except Exception:
-        return "-"
-
-
-
+# --------------------
 # Models
+# --------------------
 class User(db.Model):
+    __tablename__ = "users"  # avoid reserved keyword "user"
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
-    coins = db.Column(db.Integer, default=0)
+    coins = db.Column(db.Integer, default=500)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    sent_transactions = db.relationship('Transaction', foreign_keys='Transaction.sender_id', backref='sender', lazy=True)
-    received_transactions = db.relationship('Transaction', foreign_keys='Transaction.receiver_id', backref='receiver', lazy=True)
-    messages = db.relationship('Message', backref='user', lazy=True)
-    snake_scores = db.relationship('SnakeScore', backref='user', lazy=True)
-    flappy_scores = db.relationship('FlappyScore', backref='user', lazy=True)  # ADD THIS
-    dino_scores = db.relationship('DinoScore', backref='user', lazy=True)
-    avatar = db.Column(db.String(255), nullable=True)
-    real_name = db.Column(db.String(120), nullable=True)
-    is_verified = db.Column(db.Boolean, default=False)
-    verification_request_at = db.Column(db.DateTime, nullable=True)
-    #ui_mode = db.Column(db.String(20), default="legacy")  # "legacy" or "modern"
+
+    sent_transactions = db.relationship(
+        "Transaction", foreign_keys="Transaction.sender_id",
+        backref="sender", lazy=True
+    )
+    received_transactions = db.relationship(
+        "Transaction", foreign_keys="Transaction.receiver_id",
+        backref="receiver", lazy=True
+    )
+    messages = db.relationship("Message", backref="user", lazy=True)
+    snake_scores = db.relationship("SnakeScore", backref="user", lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+
 class Transaction(db.Model):
+    __tablename__ = "transactions"
+
     id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     amount = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class Message(db.Model):
+    __tablename__ = "messages"
+
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class SnakeScore(db.Model):
+    __tablename__ = "snake_scores"
+
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
-class SnakeReward(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, unique=True, nullable=False)
-    distributed = db.Column(db.Boolean, default=False)
+
+# --------------------
+# Schema upgrade block
+# --------------------
+with app.app_context():
+    inspector = inspect(db.engine)
+
+    # Ensure "users" table exists before altering
+    if "users" in inspector.get_table_names():
+        user_columns = [col["name"] for col in inspector.get_columns("users")]
+        dialect = db.engine.dialect.name
+
+        if "real_name" not in user_columns:
+            with db.engine.begin() as conn:
+                conn.execute(
+                    text('ALTER TABLE users ADD COLUMN real_name VARCHAR(120)')
+                )
+
+        if "is_verified" not in user_columns:
+            with db.engine.begin() as conn:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE')
+                    )
+                else:  # SQLite
+                    conn.execute(
+                        text('ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0')
+                    )
+
+        if "verification_request_at" not in user_columns:
+            with db.engine.begin() as conn:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text('ALTER TABLE users ADD COLUMN verification_request_at TIMESTAMP')
+                    )
+                else:  # SQLite
+                    conn.execute(
+                        text('ALTER TABLE users ADD COLUMN verification_request_at DATETIME')
+                    )
+
+    # Example for "party" table
+    if "party" in inspector.get_table_names():
+        party_columns = [col["name"] for col in inspector.get_columns("party")]
+        if "is_in_government" not in party_columns:
+            with db.engine.begin() as conn:
+                if db.engine.dialect.name == "postgresql":
+                    conn.execute(
+                        text('ALTER TABLE party ADD COLUMN is_in_government BOOLEAN DEFAULT FALSE')
+                    )
+                else:
+                    conn.execute(
+                        text('ALTER TABLE party ADD COLUMN is_in_government INTEGER DEFAULT 0')
+                    )
+
 
 def get_user_highscores(user_id):
     return {
