@@ -1228,24 +1228,26 @@ def calculate_riksdag_seats():
         return []
 
     party_votes = (
-        db.session.query(Party.name, func.count(Vote.id).label("votes"))
+        db.session.query(Party.id, Party.name, func.count(Vote.id).label("votes"))
         .outerjoin(Vote)
         .group_by(Party.id)
         .all()
     )
 
     results = []
-    for party_name, votes in party_votes:
+    for party_id, party_name, votes in party_votes:
         seats = round((votes / total_votes) * 49)  # total seats = 49
         color_key = party_name.lower()
         color = PARTY_COLORS.get(color_key, PARTY_COLORS["default"])
         results.append({
+            "id": party_id,       # ✅ now defined correctly
             "party": party_name,
             "votes": votes,
             "seats": seats,
             "color": color
         })
     return results
+
 
 
 @app.route('/party/create', methods=['GET', 'POST'])
@@ -1387,7 +1389,25 @@ def verify():
 @app.route('/riksdag')
 def riksdag():
     results = calculate_riksdag_seats()
-    return render_template("riksdag.html", results=results)
+    return render_template("riksdag.html", results=results, ADMIN_USERNAME=ADMIN_USERNAME)
+
+
+@app.route('/admin/delete_party/<int:party_id>', methods=['POST'])
+@login_required
+def admin_delete_party(party_id):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    party = Party.query.get_or_404(party_id)
+
+    # Delete all votes for that party first (to avoid FK constraint errors)
+    Vote.query.filter_by(party_id=party.id).delete()
+
+    db.session.delete(party)
+    db.session.commit()
+
+    flash(f"Party '{party.name}' has been deleted.", "info")
+    return redirect(url_for('riksdag'))
 
 
 if __name__ == '__main__':
