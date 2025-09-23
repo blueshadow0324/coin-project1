@@ -94,6 +94,34 @@ class SnakeScore(db.Model):
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
+class FlappyScore(db.Model):
+    __tablename__ = "flappy_scores"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+
+
+class MarketplaceItem(db.Model):
+    __tablename__ = "marketplace_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    buyer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    price = db.Column(db.Integer, nullable=False)
+    image_filename = db.Column(db.String(255), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sold_at = db.Column(db.DateTime, nullable=True)
+
+    # relationships
+    seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
+    buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
+
 
 # --------------------
 # Schema upgrade block
@@ -155,6 +183,7 @@ def get_user_highscores(user_id):
         'flappy': db.session.query(func.max(FlappyScore.score)).filter(FlappyScore.user_id == user_id).scalar() or 0,
         'dino': db.session.query(func.max(DinoScore.score)).filter(DinoScore.user_id == user_id).scalar() or 0
     }
+
 
 
 # Login required decorator
@@ -460,26 +489,6 @@ def stats():
     )
 
 
-class MarketplaceItem(db.Model):
-    __tablename__ = "marketplace_items"
-
-    id = db.Column(db.Integer, primary_key=True)
-    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-
-    title = db.Column(db.String(120), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    price = db.Column(db.Integer, nullable=False)
-    image_filename = db.Column(db.String(255), nullable=True)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    sold_at = db.Column(db.DateTime, nullable=True)
-
-    # relations
-    seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
-    buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
-
-
 @app.route('/marketplace')
 @login_required
 def marketplace():
@@ -693,13 +702,6 @@ from flask import abort, g
 from datetime import date, timedelta
 from sqlalchemy import func
 
-class FlappyScore(db.Model):
-    __tablename__ = "flappy_scores"   # make sure this line is aligned under class
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False, index=True)
 
 # --- Flappy leaderboard page ---
 @app.route('/flappy', methods=['GET'])
@@ -772,7 +774,7 @@ class BankAccount(db.Model):
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True)
     balance = db.Column(db.Integer, default=0)
     loan = db.Column(db.Integer, default=0)
     credit_score = db.Column(db.Integer, default=500)
@@ -1564,6 +1566,15 @@ def vote_constitution_final(const_id, votes_dict):
     const.final_vote_passed = False
     db.session.commit()
     return False, "Amendment failed in final vote."
+
+
+@app.route("/initdb", methods=["GET", "POST"])
+def initdb():
+    if not g.user or g.user.username != "admin":
+        abort(403)  # only allow admin
+
+    db.create_all()
+    return "Database initialized ✅"
 
 
 if __name__ == '__main__':
