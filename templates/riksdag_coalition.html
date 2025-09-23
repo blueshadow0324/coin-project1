@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Coalition Negotiation{% endblock %}
+
+{% block content %}
+<h1>Coalition Negotiation</h1>
+
+<p>Majority required: {{ majority }} seats</p>
+
+<form method="POST">
+    <table>
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Party</th>
+                <th>Seats</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for party in results %}
+            <tr>
+                <td><input type="checkbox" name="party_ids" value="{{ party.id }}"></td>
+                <td>{{ party.party }}</td>
+                <td>{{ party.seats }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="bg-blue-500 text-white px-3 py-1 rounded mt-2">Form Coalition</button>
+</form>
+
+{% if status %}
+    <h2>Result</h2>
+    {% if status == "majority" %}
+        <p>Coalition formed with {{ seats_sum }} seats:</p>
+        <ul>
+        {% for p in coalition %}
+            <li>{{ p.party }} ({{ p.seats }} seats)</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>Coalition has only {{ seats_sum }} seats. Not enough for majority.</p>
+    {% endif %}
+{% endif %}
+{% endblock %}
