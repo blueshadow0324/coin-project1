@@ -41,7 +41,7 @@ db = SQLAlchemy(app)
 # Models
 # --------------------
 class User(db.Model):
-    __tablename__ = "users"  # avoid reserved keyword "user"
+    __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -71,8 +71,8 @@ class Transaction(db.Model):
     __tablename__ = "transactions"
 
     id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    receiver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     amount = db.Column(db.Integer, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -81,7 +81,7 @@ class Message(db.Model):
     __tablename__ = "messages"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -90,7 +90,7 @@ class SnakeScore(db.Model):
     __tablename__ = "snake_scores"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
@@ -98,7 +98,7 @@ class FlappyScore(db.Model):
     __tablename__ = "flappy_scores"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
@@ -107,8 +107,8 @@ class MarketplaceItem(db.Model):
     __tablename__ = "marketplace_items"
 
     id = db.Column(db.Integer, primary_key=True)
-    seller_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    buyer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
     title = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -122,59 +122,29 @@ class MarketplaceItem(db.Model):
     seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
     buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
 
+with app.app_context():
+    u = User.query.filter_by(username='William').first()
+    if u:
+        print("Found user:", u.username)
+    else:
+        print("User not found")
 
 # --------------------
 # Schema upgrade block
 # --------------------
+from sqlalchemy import inspect, text
+
 with app.app_context():
     inspector = inspect(db.engine)
+    columns = [col['name'] for col in inspector.get_columns('user')]
 
-    # Ensure "users" table exists before altering
-    if "users" in inspector.get_table_names():
-        user_columns = [col["name"] for col in inspector.get_columns("users")]
-        dialect = db.engine.dialect.name
-
-        if "real_name" not in user_columns:
-            with db.engine.begin() as conn:
-                conn.execute(
-                    text('ALTER TABLE users ADD COLUMN real_name VARCHAR(120)')
-                )
-
-        if "is_verified" not in user_columns:
-            with db.engine.begin() as conn:
-                if dialect == "postgresql":
-                    conn.execute(
-                        text('ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE')
-                    )
-                else:  # SQLite
-                    conn.execute(
-                        text('ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0')
-                    )
-
-        if "verification_request_at" not in user_columns:
-            with db.engine.begin() as conn:
-                if dialect == "postgresql":
-                    conn.execute(
-                        text('ALTER TABLE users ADD COLUMN verification_request_at TIMESTAMP')
-                    )
-                else:  # SQLite
-                    conn.execute(
-                        text('ALTER TABLE users ADD COLUMN verification_request_at DATETIME')
-                    )
-
-    # Example for "party" table
-    if "party" in inspector.get_table_names():
-        party_columns = [col["name"] for col in inspector.get_columns("party")]
-        if "is_in_government" not in party_columns:
-            with db.engine.begin() as conn:
-                if db.engine.dialect.name == "postgresql":
-                    conn.execute(
-                        text('ALTER TABLE party ADD COLUMN is_in_government BOOLEAN DEFAULT FALSE')
-                    )
-                else:
-                    conn.execute(
-                        text('ALTER TABLE party ADD COLUMN is_in_government INTEGER DEFAULT 0')
-                    )
+    with db.engine.begin() as conn:
+        if 'real_name' not in columns:
+            conn.execute(text('ALTER TABLE user ADD COLUMN real_name VARCHAR(120)'))
+        if 'is_verified' not in columns:
+            conn.execute(text('ALTER TABLE user ADD COLUMN is_verified INTEGER DEFAULT 0'))
+        if 'verification_request_at' not in columns:
+            conn.execute(text('ALTER TABLE user ADD COLUMN verification_request_at DATETIME'))
 
 
 def get_user_highscores(user_id):
@@ -774,7 +744,7 @@ class BankAccount(db.Model):
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
     balance = db.Column(db.Integer, default=0)
     loan = db.Column(db.Integer, default=0)
     credit_score = db.Column(db.Integer, default=500)
@@ -1577,5 +1547,24 @@ def initdb():
     return "Database initialized ✅"
 
 
+from sqlalchemy import text
+
+
+from sqlalchemy import text
+
+@app.route("/migrate_user_to_users", methods=["GET"])
+def migrate_user_to_users():
+    with db.engine.begin() as conn:
+        # Drop empty table
+        conn.execute(text('DROP TABLE IF EXISTS "users";'))
+        # Rename old table
+        conn.execute(text('ALTER TABLE "user" RENAME TO "users";'))
+
+    return "Migration complete ✅"
+
+
+
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
