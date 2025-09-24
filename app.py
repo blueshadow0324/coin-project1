@@ -1560,12 +1560,6 @@ def initdb():
     db.create_all()
     return "Database initialized ✅"
 
-
-from sqlalchemy import text
-
-
-from sqlalchemy import text
-
 @app.route("/migrate_user_to_users", methods=["GET"])
 def migrate_user_to_users():
     with db.engine.begin() as conn:
@@ -1579,6 +1573,10 @@ def migrate_user_to_users():
 
 
 if __name__ == '__main__':
+    from sqlalchemy import text
+
     with app.app_context():
-        db.create_all()
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT 0"))
+
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
