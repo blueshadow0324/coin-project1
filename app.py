@@ -37,12 +37,11 @@ ALLOWED_EXTENSIONS = {"db"}
 
 db = SQLAlchemy(app)
 
-from sqlalchemy import inspect
+from sqlalchemy import text
 
-inspector = inspect(conn)
-columns = [col["name"] for col in inspector.get_columns("user")]
-if "is_verified" not in columns:
-    conn.execute(text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0'))
+with app.app_context():
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0'))
 
 
 # in your app.py
@@ -1581,10 +1580,4 @@ def migrate_user_to_users():
 
 
 if __name__ == '__main__':
-    from sqlalchemy import text
-
-    with app.app_context():
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0'))
-
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
