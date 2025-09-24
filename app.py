@@ -37,6 +37,14 @@ ALLOWED_EXTENSIONS = {"db"}
 
 db = SQLAlchemy(app)
 
+from sqlalchemy import inspect
+
+inspector = inspect(conn)
+columns = [col["name"] for col in inspector.get_columns("user")]
+if "is_verified" not in columns:
+    conn.execute(text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0'))
+
+
 # in your app.py
 from flask import Flask
 from datetime import datetime
