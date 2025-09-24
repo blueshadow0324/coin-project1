@@ -81,6 +81,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
     coins = db.Column(db.Integer, default=500)
+    is_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     sent_transactions = db.relationship(
