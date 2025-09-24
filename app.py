@@ -1281,7 +1281,7 @@ def calculate_riksdag_seats():
 
     results = []
     for party_id, party_name, votes in party_votes:
-        seats = round((votes / total_votes) * 49)  # total seats = 49
+        seats = round((votes / total_votes) * 349)  # total seats = 49
         color_key = party_name.lower()
         color = PARTY_COLORS.get(color_key, PARTY_COLORS["default"])
         results.append({
@@ -1455,7 +1455,7 @@ def riksdag_coalition():
         abort(403)
 
     results = calculate_riksdag_seats()
-    total_seats = 49
+    total_seats = 349
     majority = (total_seats // 2) + 1
 
     if request.method == 'POST':
