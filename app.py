@@ -1377,9 +1377,6 @@ def vote():
 @app.route('/admin/verify-requests')
 @login_required
 def admin_verify_requests():
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-
     pending_users = User.query.filter(
         User.is_verified == False,
         User.verification_request_at.isnot(None)
@@ -1391,9 +1388,6 @@ def admin_verify_requests():
 @app.route('/admin/approve/<int:user_id>', methods=['POST'])
 @login_required
 def admin_approve(user_id):
-    if g.user.username != ADMIN_USERNAME:
-        abort(403)
-
     user = User.query.get_or_404(user_id)
     user.is_verified = True
     db.session.commit()
