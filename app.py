@@ -182,6 +182,7 @@ with app.app_context():
         if 'verification_request_at' not in columns:
             conn.execute(text('ALTER TABLE user ADD COLUMN verification_request_at DATETIME'))
 
+flappy_scores = db.relationship('FlappyScore', backref='user', lazy=True)
 
 def get_user_highscores(user_id):
     return {
