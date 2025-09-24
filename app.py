@@ -80,7 +80,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
-    coins = db.Column(db.Integer, default=500)
+    coins = db.Column(db.Integer, default=0)
     is_verified = db.Column(db.Boolean, default=False)
     verification_request_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
