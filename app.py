@@ -1577,6 +1577,6 @@ if __name__ == '__main__':
 
     with app.app_context():
         with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT 0"))
+            conn.execute(text("ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0"))
 
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
