@@ -39,9 +39,20 @@ db = SQLAlchemy(app)
 
 from sqlalchemy import text
 
-with app.app_context():
+from sqlalchemy import inspect, text
+
+with app.app_context():  # makes sure Flask knows which app/db to use
+    inspector = inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("user")]
+
+    if "is_verified" not in columns:
         with db.engine.connect() as conn:
             conn.execute(text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0'))
+            conn.commit()  # important for PostgreSQL
+        print("✅ Column 'is_verified' added.")
+    else:
+        print("ℹ️ Column 'is_verified' already exists.")
+
 
 
 # in your app.py
