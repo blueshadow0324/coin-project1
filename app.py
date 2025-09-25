@@ -1784,12 +1784,6 @@ def vote_constitution_final(const_id, votes_dict):
     db.session.commit()
     return False, "Amendment failed in final vote."
 
-
-@app.route("/initdb", methods=["GET", "POST"])
-def initdb():
-    if not g.user or g.user.username != "admin":
-        abort(403)  # only allow admin
-
     db.create_all()
     return "Database initialized ✅"
 
