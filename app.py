@@ -1887,6 +1887,20 @@ def form_government_self():
 
     return redirect(url_for('riksdag'))
 
+@app.route('/admin/force_government/<int:party_id>', methods=['POST'])
+@login_required
+def admin_force_government(party_id):
+    if g.user.username != ADMIN_USERNAME:
+        flash("Admins only!", "danger")
+        return redirect(url_for('riksdag'))
+
+    party = Party.query.get_or_404(party_id)
+    party.is_in_government = True
+    db.session.commit()
+
+    flash(f"Admin has forced {party.name} to form government ✅", "success")
+    return redirect(url_for('riksdag'))
+
 @app.route("/admin/migrate_bills")
 def migrate_bills():
     from sqlalchemy import text
@@ -1903,20 +1917,6 @@ def migrate_bills():
             print("vote_deadline exists:", e)
 
     return "✅ Migration complete for Bill table"
-
-@app.route('/admin/force_government/<int:party_id>', methods=['POST'])
-@login_required
-def admin_force_government(party_id):
-    if g.user.username != ADMIN_USERNAME:
-        flash("Admins only!", "danger")
-        return redirect(url_for('riksdag'))
-
-    party = Party.query.get_or_404(party_id)
-    party.is_in_government = True
-    db.session.commit()
-
-    flash(f"Admin has forced {party.name} to form government ✅", "success")
-    return redirect(url_for('riksdag'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
