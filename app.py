@@ -14,6 +14,8 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import backref
 import subprocess
+from flask_login import LoginManager, login_required, current_user
+
 
 # Flask app
 app = Flask(__name__)
@@ -41,18 +43,17 @@ login_manager = LoginManager()
 login_manager.login_view = "login"  # your login route
 login_manager.init_app(app)
 
-# User loader for Flask-Login
-# Flask-Login setup
 from flask_login import LoginManager, login_required, current_user
+from functools import wraps
 
 login_manager = LoginManager()
-login_manager.login_view = "login"  # route name for login page
+login_manager.login_view = "login"
 login_manager.init_app(app)
 
-# User loader (use your existing User model)
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))  # User is your existing model in app.py
+    return User.query.get(int(user_id))  # Use your existing User model
+
 
 # Admin migration route
 @app.route("/admin/migrate_tables", methods=['GET'])
