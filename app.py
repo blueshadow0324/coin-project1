@@ -41,30 +41,44 @@ from sqlalchemy import text
 
 from sqlalchemy import inspect, text
 
+from sqlalchemy import inspect, text
+
 with app.app_context():
     inspector = inspect(db.engine)
 
     # --- For bill table ---
     bill_columns = [col["name"] for col in inspector.get_columns("bill")]
+
     if "created_at" not in bill_columns:
         with db.engine.begin() as conn:
             conn.execute(
-                text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                text("ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
             )
         print("✅ Column 'created_at' added to bill.")
     else:
         print("ℹ️ Column 'created_at' already exists in bill.")
 
+    if "vote_deadline" not in bill_columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP")
+            )
+        print("✅ Column 'vote_deadline' added to bill.")
+    else:
+        print("ℹ️ Column 'vote_deadline' already exists in bill.")
+
     # --- For user table ---
     user_columns = [col["name"] for col in inspector.get_columns("user")]
+
     if "is_verified" not in user_columns:
         with db.engine.begin() as conn:
             conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0')
+                text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT FALSE')
             )
         print("✅ Column 'is_verified' added to user.")
     else:
         print("ℹ️ Column 'is_verified' already exists in user.")
+
 
 
 from sqlalchemy import inspect
