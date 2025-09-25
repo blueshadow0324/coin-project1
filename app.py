@@ -14,8 +14,6 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import backref
 import subprocess
-from flask_login import LoginManager, login_required, current_user
-
 
 # Flask app
 app = Flask(__name__)
@@ -23,72 +21,21 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_size": 20,
-    "max_overflow": 20,
-    "pool_timeout": 30,
-    "pool_recycle": 1800
+    "pool_size": 20,       # default 5
+    "max_overflow": 20,    # default 10
+    "pool_timeout": 30,    # seconds
+    "pool_recycle": 1800   # recycle connections every 30 minutes
 }
 
-# Upload folder setup
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 ALLOWED_EXTENSIONS = {"db"}
 
-# Database
 db = SQLAlchemy(app)
-
-# Flask-Login setup
-login_manager = LoginManager()
-login_manager.login_view = "login"  # your login route
-login_manager.init_app(app)
-
-from flask_login import LoginManager, login_required, current_user
-from functools import wraps
-
-login_manager = LoginManager()
-login_manager.login_view = "login"
-login_manager.init_app(app)
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))  # Use your existing User model
-
-
-# Admin migration route
-@app.route("/admin/migrate_tables", methods=['GET'])
-@login_required
-def migrate_tables():
-    if not current_user.is_authenticated or current_user.username != "ADMIN_USERNAME":
-        return "Forbidden", 403
-
-    with db.engine.connect() as conn:
-        # Bill table
-        try:
-            conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
-        except Exception as e:
-            print("bill.created_at exists or error:", e)
-
-        try:
-            conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
-        except Exception as e:
-            print("bill.vote_deadline exists or error:", e)
-
-        # Constitution table
-        try:
-            conn.execute(text('ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'))
-        except Exception as e:
-            print("constitution.first_vote_deadline exists or error:", e)
-
-        try:
-            conn.execute(text('ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'))
-        except Exception as e:
-            print("constitution.final_vote_deadline exists or error:", e)
-
-    return "✅ Migration complete for Bill and Constitution tables"
-
-
-
 
 from sqlalchemy import text
 
@@ -123,7 +70,6 @@ def safe_create_tables():
 @app.before_request
 def init_db():
     safe_create_tables()
-
 
 
 # in your app.py
