@@ -41,18 +41,30 @@ from sqlalchemy import text
 
 from sqlalchemy import inspect, text
 
-with app.app_context():  # ensures db is bound to the Flask app
+with app.app_context():
     inspector = inspect(db.engine)
-    columns = [col["name"] for col in inspector.get_columns("user")]
 
-    if "is_verified" not in columns:
-        with db.engine.begin() as conn:  # begin() handles commit/rollback automatically
+    # --- For bill table ---
+    bill_columns = [col["name"] for col in inspector.get_columns("bill")]
+    if "created_at" not in bill_columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text('ALTER TABLE bill ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP')
+            )
+        print("✅ Column 'created_at' added to bill.")
+    else:
+        print("ℹ️ Column 'created_at' already exists in bill.")
+
+    # --- For user table ---
+    user_columns = [col["name"] for col in inspector.get_columns("user")]
+    if "is_verified" not in user_columns:
+        with db.engine.begin() as conn:
             conn.execute(
                 text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT 0')
             )
-        print("✅ Column 'is_verified' added.")
+        print("✅ Column 'is_verified' added to user.")
     else:
-        print("ℹ️ Column 'is_verified' already exists.")
+        print("ℹ️ Column 'is_verified' already exists in user.")
 
 
 from sqlalchemy import inspect
@@ -1815,6 +1827,37 @@ def vote_constitution_final(const_id, votes_dict):
 
     db.create_all()
     return "Database initialized ✅"
+
+@app.route("/admin/migrate_tables", methods=['GET'])
+@login_required
+def migrate_tables():
+    if not g.user or g.user.username != "ADMIN_USERNAME":
+        return "Forbidden", 403
+
+    with db.engine.connect() as conn:
+        # Bill table
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
+        except Exception as e:
+            print("bill.created_at exists:", e)
+
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("bill.vote_deadline exists:", e)
+
+        # Constitution table
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.first_vote_deadline exists:", e)
+
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.final_vote_deadline exists:", e)
+
+    return "✅ Migration complete for Bill and Constitution tables"
 
 @app.route("/migrate_user_to_users", methods=["GET"])
 def migrate_user_to_users():
