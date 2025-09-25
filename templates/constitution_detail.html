@@ -3,6 +3,21 @@
 <h2>{{ const.title }}</h2>
 <p>{{ const.content }}</p>
 
+<h4>Voting Status</h4>
+
+{% if const.first_vote_passed %}
+  <p>✅ First vote passed.</p>
+  <p>Final vote scheduled at: {{ const.final_vote_date.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+  {% if const.final_vote_deadline %}
+    <p>Final vote ends at: {{ const.final_vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+  {% endif %}
+{% else %}
+  <p>🗳️ First vote ongoing.</p>
+  {% if const.first_vote_deadline %}
+    <p>First vote ends at: {{ const.first_vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+  {% endif %}
+{% endif %}
+
 <h3>Cast Vote</h3>
 <form method="post">
   <input type="hidden" name="phase" value="first">
