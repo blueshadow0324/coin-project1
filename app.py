@@ -1797,6 +1797,42 @@ def migrate_user_to_users():
 
     return "Migration complete ✅"
 
+@app.route('/admin/end_weekly_vote', methods=['POST', 'GET'])
+@login_required
+def end_weekly_vote():
+    if g.user.username != ADMIN_USERNAME:
+        flash("Admins only!", "danger")
+        return redirect(url_for('riksdag'))
+
+    results = calculate_riksdag_seats()
+
+    # Clear all votes for next week
+    Vote.query.delete()
+    db.session.commit()
+
+    flash("Weekly Riksdag vote ended early. Results have been calculated!", "info")
+    return render_template("riksdag.html", results=results)
+@app.route('/admin/end_const_vote/<int:const_id>/<phase>', methods=['POST', 'GET'])
+@login_required
+def end_const_vote(const_id, phase):
+    if g.user.username != ADMIN_USERNAME:
+        flash("Admins only!", "danger")
+        return redirect(url_for('constitution_list'))
+
+    const = Constitution.query.get_or_404(const_id)
+
+    if phase == "first" and not const.first_vote_passed:
+        vote_constitution_first(const.id, {})  # empty dict counts all as NO? Or just tally current votes
+        flash(f"First vote on '{const.title}' ended early.", "info")
+
+    elif phase == "final" and const.first_vote_passed and not const.final_vote_passed:
+        vote_constitution_final(const.id, {})  # tally current votes
+        flash(f"Final vote on '{const.title}' ended early.", "info")
+
+    else:
+        flash("Cannot end vote: either phase already completed or invalid.", "warning")
+
+    return redirect(url_for('constitution_detail', const_id=const.id))
 
 
 if __name__ == '__main__':
