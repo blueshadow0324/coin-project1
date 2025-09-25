@@ -1906,4 +1906,7 @@ def admin_force_government(party_id):
 
 
 if __name__ == '__main__':
+    with app.app_context():
+        results = calculate_riksdag_seats()
+        print("Riksdag seats:", results)
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
