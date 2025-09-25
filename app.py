@@ -1,19 +1,13 @@
 # app.py
 import os
-import json
-from datetime import datetime, date
-from functools import wraps
-import random
+from datetime import datetime
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, flash, g, jsonify, send_file, abort
+    flash, abort
 )
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from sqlalchemy import func, inspect, text
-from sqlalchemy.orm import backref
-import subprocess
+from sqlalchemy import text
+from flask_login import LoginManager, login_required, current_user
 
 # Flask app
 app = Flask(__name__)
@@ -21,21 +15,68 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_size": 20,       # default 5
-    "max_overflow": 20,    # default 10
-    "pool_timeout": 30,    # seconds
-    "pool_recycle": 1800   # recycle connections every 30 minutes
+    "pool_size": 20,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "pool_recycle": 1800
 }
 
+# Upload folder setup
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {"db"}
 
+# Database
 db = SQLAlchemy(app)
+
+# Flask-Login setup
+login_manager = LoginManager()
+login_manager.login_view = "login"  # your login route
+login_manager.init_app(app)
+
+# User loader for Flask-Login
+from your_models import User  # replace with your actual User model
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# -----------------------
+# Admin migration route
+# -----------------------
+@app.route("/admin/migrate_tables", methods=['GET'])
+@login_required
+def migrate_tables():
+    if not current_user.is_authenticated or current_user.username != "ADMIN_USERNAME":
+        return "Forbidden", 403
+
+    with db.engine.connect() as conn:
+        # Bill table
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
+        except Exception as e:
+            print("bill.created_at exists or error:", e)
+
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("bill.vote_deadline exists or error:", e)
+
+        # Constitution table
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.first_vote_deadline exists or error:", e)
+
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.final_vote_deadline exists or error:", e)
+
+    return "✅ Migration complete for Bill and Constitution tables"
+
+
 
 from sqlalchemy import text
 
@@ -1900,44 +1941,6 @@ def admin_force_government(party_id):
 
     flash(f"Admin has forced {party.name} to form government ✅", "success")
     return redirect(url_for('riksdag'))
-
-from sqlalchemy import text
-from flask import flash
-from flask import g, flash, redirect, url_for, request, abort, render_template
-from flask_login import login_required
-
-
-@app.route("/admin/migrate_tables", methods=['GET'])
-@login_required
-def migrate_tables():
-    if not g.user or g.user.username != "ADMIN_USERNAME":
-        return "Forbidden", 403
-
-    with db.engine.connect() as conn:
-        # Bill table
-        try:
-            conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
-        except Exception as e:
-            print("bill.created_at exists:", e)
-
-        try:
-            conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
-        except Exception as e:
-            print("bill.vote_deadline exists:", e)
-
-        # Constitution table
-        try:
-            conn.execute(text('ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'))
-        except Exception as e:
-            print("constitution.first_vote_deadline exists:", e)
-
-        try:
-            conn.execute(text('ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'))
-        except Exception as e:
-            print("constitution.final_vote_deadline exists:", e)
-
-    return "✅ Migration complete for Bill and Constitution tables"
-
 
 
 if __name__ == '__main__':
