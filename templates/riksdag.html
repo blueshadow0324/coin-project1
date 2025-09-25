@@ -47,6 +47,12 @@
                     </button>
                 </form>
             {% endif %}
+            {% if g.user.username == ADMIN_USERNAME %}
+                <form method="post" action="{{ url_for('admin_force_government', party_id=p.id) }}">
+                     <button type="submit" class="btn btn-warning btn-sm">Force Government</button>
+                </form>
+             {% endif %}
+
         </li>
     {% endfor %}
 </ul>
