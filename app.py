@@ -36,15 +36,19 @@ login_manager.login_view = "login"  # your login route
 login_manager.init_app(app)
 
 # User loader for Flask-Login
-from your_models import User  # replace with your actual User model
+# Flask-Login setup
+from flask_login import LoginManager, login_required, current_user
 
+login_manager = LoginManager()
+login_manager.login_view = "login"  # route name for login page
+login_manager.init_app(app)
+
+# User loader (use your existing User model)
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return User.query.get(int(user_id))  # User is your existing model in app.py
 
-# -----------------------
 # Admin migration route
-# -----------------------
 @app.route("/admin/migrate_tables", methods=['GET'])
 @login_required
 def migrate_tables():
@@ -75,6 +79,7 @@ def migrate_tables():
             print("constitution.final_vote_deadline exists or error:", e)
 
     return "✅ Migration complete for Bill and Constitution tables"
+
 
 
 
