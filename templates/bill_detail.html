@@ -42,6 +42,11 @@
 
 <hr>
 
+<p>
+  Voting ends at: {{ bill.vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}<br>
+  Time remaining: {{ (bill.vote_deadline - now).total_seconds() // 3600 }} hours
+</p>
+
 <h5>Party Votes</h5>
 <ul>
   {% for v in votes %}
