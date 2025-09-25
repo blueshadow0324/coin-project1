@@ -1672,6 +1672,7 @@ def riksdag():
     return render_template("riksdag.html", results=results, ADMIN_USERNAME=ADMIN_USERNAME)
 
 
+
 @app.route('/admin/delete_party/<int:party_id>', methods=['POST'])
 @login_required
 def admin_delete_party(party_id):
@@ -1863,10 +1864,6 @@ def end_const_vote(const_id, phase):
 
     return redirect(url_for('constitution_detail', const_id=const.id))
 
-results = calculate_riksdag_seats()
-total_seats = 349
-majority = (total_seats // 2) + 1
-
 @app.route('/government/form_self', methods=['POST'])
 @login_required
 def form_government_self():
@@ -1903,10 +1900,5 @@ def admin_force_government(party_id):
     flash(f"Admin has forced {party.name} to form government ✅", "success")
     return redirect(url_for('riksdag'))
 
-
-
 if __name__ == '__main__':
-    with app.app_context():
-        results = calculate_riksdag_seats()
-        print("Riksdag seats:", results)
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
