@@ -267,8 +267,12 @@ def login_required(f):
 
 @app.before_request
 def load_logged_in_user():
-    user_id = session.get('user_id')
-    g.user = User.query.get(user_id) if user_id else None
+    user_id = session.get("user_id")
+    if user_id is None:
+        g.user = None
+    else:
+        g.user = User.query.get(user_id)  # Make sure User is imported
+
 
 # --- Utility ---
 def allowed_file(filename):
