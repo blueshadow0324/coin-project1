@@ -1834,6 +1834,34 @@ def end_const_vote(const_id, phase):
 
     return redirect(url_for('constitution_detail', const_id=const.id))
 
+results = calculate_riksdag_seats()
+total_seats = 349
+majority = (total_seats // 2) + 1
+
+@app.route('/government/form_self', methods=['POST'])
+@login_required
+def form_government_self():
+    party = Party.query.filter_by(founder_id=g.user.id).first()
+    if not party:
+        flash("Only party founders can form a government!", "danger")
+        return redirect(url_for('riksdag'))
+
+    results = calculate_riksdag_seats()
+    party_seats = next((p["seats"] for p in results if p["id"] == party.id), 0)
+    total_seats = sum(p["seats"] for p in results)
+    majority = (total_seats // 2) + 1
+
+    if party_seats >= majority:
+        # Mark this party as in government
+        party.is_in_government = True
+        db.session.commit()
+        flash(f"{party.name} now forms a government alone ✅", "success")
+    else:
+        flash("You do not have a majority. Coalition required.", "warning")
+
+    return redirect(url_for('riksdag'))
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
