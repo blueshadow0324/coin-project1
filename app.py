@@ -253,6 +253,17 @@ def load_logged_in_user():
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
+from datetime import datetime
+from flask import Flask
+
+app = Flask(__name__)
+
+# Context processor makes `now` available in all templates
+@app.context_processor
+def inject_now():
+    return {'now': datetime.now}
+
+
 # --- Routes ---
 @app.route('/')
 def index():
