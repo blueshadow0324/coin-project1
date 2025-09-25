@@ -5,7 +5,7 @@
 
 <hr>
 
-<h4>Live Vote Tally</h4>
+<h4>Live Röst Tabell</h4>
 <div class="progress" style="height: 30px;">
   <div class="progress-bar bg-success" role="progressbar"
        style="width: {{ (yes_seats / total_seats) * 100 }}%"
@@ -32,12 +32,12 @@
 
 {% if g.user and g.user.party and g.user.id == g.user.party.founder_id %}
 <form method="post">
-  <button type="submit" name="vote" value="yes" class="btn btn-success">Vote YES</button>
-  <button type="submit" name="vote" value="no" class="btn btn-danger">Vote NO</button>
-  <button type="submit" name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+  <button type="submit" name="vote" value="yes" class="btn btn-success">Rösta Ja</button>
+  <button type="submit" name="vote" value="no" class="btn btn-danger">Rösta Nej</button>
+  <button type="submit" name="vote" value="abstain" class="btn btn-secondary">Avstå</button>
 </form>
 {% else %}
-<p><em>Only party leaders can vote on bills.</em></p>
+<p><em>Bara parti ledare kan rösta på lagar.</em></p>
 {% endif %}
 
 <hr>
@@ -47,7 +47,7 @@
   Time remaining: {{ (bill.vote_deadline - now).total_seconds() // 3600 }} hours
 </p>
 
-<h5>Party Votes</h5>
+<h5>Parti Röster</h5>
 <ul>
   {% for v in votes %}
     <li>Party {{ v.party_id }} voted {{ v.vote_choice|capitalize }}</li>
