@@ -41,4 +41,13 @@
         <p>Coalition has only {{ seats_sum }} seats. Not enough for majority.</p>
     {% endif %}
 {% endif %}
+
+{% if g.user.party and g.user.id == g.user.party.founder_id %}
+<form method="post" action="{{ url_for('form_government_self') }}">
+  <button type="submit" class="btn btn-success mt-2">
+    Form Government (Self, Majority)
+  </button>
+</form>
+{% endif %}
+
 {% endblock %}
