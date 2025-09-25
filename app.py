@@ -1381,6 +1381,15 @@ def bill_detail(bill_id):
         flash("Your vote has been recorded.", "success")
         return redirect(url_for('bill_detail', bill_id=bill.id))
 
+    from datetime import datetime
+
+    if request.method == 'POST':
+      if datetime.utcnow() > bill.vote_deadline:
+        flash("Voting period for this bill has ended.", "danger")
+        return redirect(url_for('bill_detail', bill_id=bill.id))
+
+    # Record vote normally
+
     # ✅ tally votes with seat weights
     votes = BillVote.query.filter_by(bill_id=bill.id).all()
     seat_distribution = calculate_riksdag_seats()
@@ -1450,6 +1459,16 @@ def propose_constitution():
 def constitution_detail(const_id):
     const = Constitution.query.get_or_404(const_id)
     party = Party.query.filter_by(founder_id=g.user.id).first()
+    phase = request.form.get("phase")
+
+    if phase == "first":
+      if datetime.utcnow() > const.first_vote_deadline:
+        flash("First vote period ended.", "danger")
+        return redirect(url_for('constitution_detail', const_id=const.id))
+    elif phase == "final":
+      if datetime.utcnow() > const.final_vote_deadline:
+        flash("Final vote period ended.", "danger")
+        return redirect(url_for('constitution_detail', const_id=const.id))
 
     if request.method == 'POST':
         phase = request.form.get("phase")  # "first" or "final"
@@ -1721,20 +1740,22 @@ def form_government(selected_parties_ids):
     return True, "Government formed successfully!"
 
 def vote_on_bill(bill_id, votes_dict):
-    """
-    votes_dict = {party_id: 'yes'/'no'/'abstain'}
-    """
     bill = Bill.query.get(bill_id)
-    results = calculate_riksdag_seats()
-    total_seats = sum([p["seats"] for p in results])
-    yes_seats = sum([p["seats"] for p in results if votes_dict.get(p["id"]) == "yes"])
+    now = datetime.utcnow()
+    if now > bill.vote_deadline:
+        return bill.passed  # ignore late votes
 
-    if yes_seats > total_seats / 2:
-        bill.passed = True
-    else:
-        bill.passed = False
+    results = calculate_riksdag_seats()
+    total_seats = sum(p["seats"] for p in results)
+    yes_seats = sum(
+        p["seats"] for p in results
+        if votes_dict.get(p["id"]) == "yes"
+    )
+
+    bill.passed = yes_seats > total_seats / 2
     db.session.commit()
     return bill.passed
+
 
 class Constitution(db.Model):
     id = db.Column(db.Integer, primary_key=True)
