@@ -1,35 +1,29 @@
 # app.py
-import os
-import json
+
+import os, json, random
 from datetime import datetime, date
 from functools import wraps
-import random
-from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, g, jsonify, send_file, abort
-)
+from flask import Flask, g, session, redirect, url_for, render_template, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from sqlalchemy import func, inspect, text
-from sqlalchemy.orm import backref
-import subprocess
+from sqlalchemy import inspect, text, func
 
-# Flask app
+# -----------------------
+# App setup
+# -----------------------
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_size": 20,       # default 5
-    "max_overflow": 20,    # default 10
-    "pool_timeout": 30,    # seconds
-    "pool_recycle": 1800   # recycle connections every 30 minutes
+    "pool_size": 20,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "pool_recycle": 1800
 }
 
 UPLOAD_FOLDER = "uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -37,108 +31,11 @@ ALLOWED_EXTENSIONS = {"db"}
 
 db = SQLAlchemy(app)
 
-from sqlalchemy import text
-
-from sqlalchemy import inspect, text
-
-from sqlalchemy import inspect, text
-
-with app.app_context():
-    inspector = inspect(db.engine)
-
-     # --- Constitution table ---
-    const_columns = [col["name"] for col in inspector.get_columns("constitution")]
-
-    if "first_vote_deadline" not in const_columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP")
-            )
-        print("✅ Column 'first_vote_deadline' added to constitution.")
-    else:
-        print("ℹ️ Column 'first_vote_deadline' already exists.")
-
-    if "final_vote_deadline" not in const_columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP")
-            )
-        print("✅ Column 'final_vote_deadline' added to constitution.")
-    else:
-        print("ℹ️ Column 'final_vote_deadline' already exists.")
-
-    # --- For bill table ---
-    bill_columns = [col["name"] for col in inspector.get_columns("bill")]
-
-    if "created_at" not in bill_columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            )
-        print("✅ Column 'created_at' added to bill.")
-    else:
-        print("ℹ️ Column 'created_at' already exists in bill.")
-
-    if "vote_deadline" not in bill_columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP")
-            )
-        print("✅ Column 'vote_deadline' added to bill.")
-    else:
-        print("ℹ️ Column 'vote_deadline' already exists in bill.")
-
-    # --- For user table ---
-    user_columns = [col["name"] for col in inspector.get_columns("user")]
-
-    if "is_verified" not in user_columns:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT FALSE')
-            )
-        print("✅ Column 'is_verified' added to user.")
-    else:
-        print("ℹ️ Column 'is_verified' already exists in user.")
-
-
-
-from sqlalchemy import inspect
-
-def safe_create_tables():
-    inspector = inspect(db.engine)
-    existing_tables = inspector.get_table_names()
-
-    # Only create missing tables
-    for model in [CoalitionProposal, BillVote, ConstitutionVote]:
-        if model.__tablename__ not in existing_tables:
-            model.__table__.create(db.engine)
-            print(f"Created missing table: {model.__tablename__}")
-
-@app.before_request
-def init_db():
-    safe_create_tables()
-
-
-# in your app.py
-from flask import Flask
-from datetime import datetime
-
-# Custom filter
-@app.template_filter('datetimeformat')
-def datetimeformat(value, format='%Y-%m-%d %H:%M'):
-    if isinstance(value, datetime):
-        return value.strftime(format)
-    return value
-
-# Example usage in Jinja2 template:
-# {{ user.created_at|datetimeformat('%d/%m/%Y') }}
-
-# --------------------
+# -----------------------
 # Models
-# --------------------
+# -----------------------
 class User(db.Model):
     __tablename__ = "user"
-
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(512), nullable=False)
@@ -147,16 +44,11 @@ class User(db.Model):
     verification_request_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    sent_transactions = db.relationship(
-        "Transaction", foreign_keys="Transaction.sender_id",
-        backref="sender", lazy=True
-    )
-    received_transactions = db.relationship(
-        "Transaction", foreign_keys="Transaction.receiver_id",
-        backref="receiver", lazy=True
-    )
+    sent_transactions = db.relationship("Transaction", foreign_keys="Transaction.sender_id", backref="sender", lazy=True)
+    received_transactions = db.relationship("Transaction", foreign_keys="Transaction.receiver_id", backref="receiver", lazy=True)
     messages = db.relationship("Message", backref="user", lazy=True)
     snake_scores = db.relationship("SnakeScore", backref="user", lazy=True)
+    flappy_scores = db.relationship("FlappyScore", backref="user", lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -167,7 +59,6 @@ class User(db.Model):
 
 class Transaction(db.Model):
     __tablename__ = "transactions"
-
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
@@ -177,7 +68,6 @@ class Transaction(db.Model):
 
 class Message(db.Model):
     __tablename__ = "messages"
-
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -186,15 +76,14 @@ class Message(db.Model):
 
 class SnakeScore(db.Model):
     __tablename__ = "snake_scores"
-
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     date = db.Column(db.Date, nullable=False, index=True)
 
+
 class FlappyScore(db.Model):
     __tablename__ = "flappy_scores"
-
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     score = db.Column(db.Integer, nullable=False)
@@ -203,96 +92,93 @@ class FlappyScore(db.Model):
 
 class MarketplaceItem(db.Model):
     __tablename__ = "marketplace_items"
-
     id = db.Column(db.Integer, primary_key=True)
     seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
-
     title = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=True)
     price = db.Column(db.Integer, nullable=False)
     image_filename = db.Column(db.String(255), nullable=True)
-
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sold_at = db.Column(db.DateTime, nullable=True)
 
-    # relationships
     seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
     buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
 
-with app.app_context():
-    u = User.query.filter_by(username='William').first()
-    if u:
-        print("Found user:", u.username)
-    else:
-        print("User not found")
+# -----------------------
+# Before request
+# -----------------------
+@app.before_request
+def load_logged_in_user():
+    g.user = None
+    user_id = session.get("user_id")
+    if user_id:
+        try:
+            g.user = User.query.get(user_id)
+        except Exception as e:
+            print("Error loading g.user:", e)
+            g.user = None
 
-# --------------------
-# Schema upgrade block
-# --------------------
-from sqlalchemy import inspect, text
-
-with app.app_context():
-    inspector = inspect(db.engine)
-    columns = [col['name'] for col in inspector.get_columns('user')]
-
-    with db.engine.begin() as conn:
-        if 'real_name' not in columns:
-            conn.execute(text('ALTER TABLE user ADD COLUMN real_name VARCHAR(120)'))
-        if 'is_verified' not in columns:
-            conn.execute(text('ALTER TABLE user ADD COLUMN is_verified INTEGER DEFAULT 0'))
-        if 'verification_request_at' not in columns:
-            conn.execute(text('ALTER TABLE user ADD COLUMN verification_request_at DATETIME'))
-
-flappy_scores = db.relationship('FlappyScore', backref='user', lazy=True)
-
-def get_user_highscores(user_id):
+# -----------------------
+# Context processor
+# -----------------------
+@app.context_processor
+def inject_globals():
     return {
-        'snake': db.session.query(func.max(SnakeScore.score)).filter(SnakeScore.user_id == user_id).scalar() or 0,
-        'flappy': db.session.query(func.max(FlappyScore.score)).filter(FlappyScore.user_id == user_id).scalar() or 0,
-        'dino': db.session.query(func.max(DinoScore.score)).filter(DinoScore.user_id == user_id).scalar() or 0
+        'user': getattr(g, 'user', None),
+        'now': datetime.now
     }
 
+# -----------------------
+# Schema upgrade block
+# -----------------------
+with app.app_context():
+    inspector = inspect(db.engine)
+    # Example: Add missing columns to user table
+    user_columns = [col['name'] for col in inspector.get_columns('user')]
+    with db.engine.begin() as conn:
+        if 'is_verified' not in user_columns:
+            conn.execute(text('ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
+        if 'verification_request_at' not in user_columns:
+            conn.execute(text('ALTER TABLE user ADD COLUMN verification_request_at DATETIME'))
 
-
-# Login required decorator
+# -----------------------
+# Utility / decorators
+# -----------------------
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
+        if not getattr(g, 'user', None):
             flash('Du måste vara inloggad för att se den sidan.', 'warning')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
-@app.before_request
-def load_logged_in_user():
-    user_id = session.get("user_id")
-    if user_id is None:
-        g.user = None
-    else:
-        g.user = User.query.get(user_id)  # Make sure User is imported
-
-
-# --- Utility ---
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-from datetime import datetime
-from flask import Flask
+@app.template_filter('datetimeformat')
+def datetimeformat(value, format='%Y-%m-%d %H:%M'):
+    if isinstance(value, datetime):
+        return value.strftime(format)
+    return value
 
-app = Flask(__name__)
-
-# Context processor makes `now` available in all templates
-@app.context_processor
-def inject_now():
-    return {'now': datetime.now}
-
-
-# --- Routes ---
+# -----------------------
+# Routes
+# -----------------------
 @app.route('/')
 def index():
-    return redirect(url_for('dashboard') if g.user else url_for('login'))
+    if getattr(g, 'user', None):
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+# -----------------------
+# Run the app (optional)
+# -----------------------
+# if __name__ == '__main__':
+#     app.run(debug=True)
+
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
