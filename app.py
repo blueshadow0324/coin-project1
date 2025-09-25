@@ -1,13 +1,19 @@
 # app.py
 import os
-from datetime import datetime
+import json
+from datetime import datetime, date
+from functools import wraps
+import random
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, abort
+    session, flash, g, jsonify, send_file, abort
 )
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
-from flask_login import LoginManager, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from sqlalchemy import func, inspect, text
+from sqlalchemy.orm import backref
+import subprocess
 
 # Flask app
 app = Flask(__name__)
