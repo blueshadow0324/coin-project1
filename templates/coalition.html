@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Coalitions</h2>
+
+{% if user_party %}
+<h3>Propose Coalition</h3>
+<form method="post">
+  <select name="invited_party_id" class="form-select">
+    {% for p in parties %}
+      {% if p.id != user_party.id %}
+        <option value="{{ p.id }}">{{ p.name }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-primary mt-2">Send Proposal</button>
+</form>
+{% else %}
+<p><em>You must be a party founder to propose coalitions.</em></p>
+{% endif %}
+
+<hr>
+
+<h3>Proposals</h3>
+<table class="table">
+  <thead>
+    <tr>
+      <th>Proposer</th>
+      <th>Invited</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in proposals %}
+    <tr>
+      <td>Party {{ c.proposer_party_id }}</td>
+      <td>Party {{ c.invited_party_id }}</td>
+      <td>{{ c.status }}</td>
+      <td>
+        {% if user_party and c.invited_party_id == user_party.id and c.status == "pending" %}
+          <form method="post" action="{{ url_for('coalition_respond', proposal_id=c.id, action='accept') }}" style="display:inline">
+            <button type="submit" class="btn btn-success btn-sm">Accept</button>
+          </form>
+          <form method="post" action="{{ url_for('coalition_respond', proposal_id=c.id, action='reject') }}" style="display:inline">
+            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+          </form>
+        {% else %}
+          <em>No actions</em>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

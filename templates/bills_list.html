@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>All Bills</h2>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Proposer</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in bills %}
+    <tr>
+      <td>{{ b.title }}</td>
+      <td>Party {{ b.proposer_party_id }}</td>
+      <td>
+        {% if b.passed %}
+          <span class="badge bg-success">Passed</span>
+        {% else %}
+          <span class="badge bg-warning">Pending</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('bill_detail', bill_id=b.id) }}" class="btn btn-primary btn-sm">View & Vote</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

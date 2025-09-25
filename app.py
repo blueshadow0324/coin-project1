@@ -1244,6 +1244,27 @@ class Bill(db.Model):
     proposer_party_id = db.Column(db.Integer, db.ForeignKey('party.id'))
     passed = db.Column(db.Boolean, default=False)
 
+class CoalitionProposal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    proposer_party_id = db.Column(db.Integer, db.ForeignKey('party.id'))
+    invited_party_id = db.Column(db.Integer, db.ForeignKey('party.id'))
+    status = db.Column(db.String(20), default="pending")  # "pending", "accepted", "rejected"
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class BillVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    bill_id = db.Column(db.Integer, db.ForeignKey('bill.id'), nullable=False)
+    party_id = db.Column(db.Integer, db.ForeignKey('party.id'), nullable=False)
+    vote_choice = db.Column(db.String(10), nullable=False)  # "yes", "no", "abstain"
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ConstitutionVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    constitution_id = db.Column(db.Integer, db.ForeignKey('constitution.id'), nullable=False)
+    party_id = db.Column(db.Integer, db.ForeignKey('party.id'), nullable=False)
+    vote_choice = db.Column(db.String(10), nullable=False)
+    phase = db.Column(db.String(10), nullable=False)  # "first" or "final"
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 PARTY_COLORS = {
@@ -1255,6 +1276,166 @@ PARTY_COLORS = {
     # fallback color
     "default": "7f8c8d"
 }
+
+
+@app.route('/coalition', methods=['GET', 'POST'])
+@login_required
+def coalition_page():
+    user_party = Party.query.filter_by(founder_id=g.user.id).first()
+    proposals = CoalitionProposal.query.all()
+    parties = Party.query.all()
+
+    if request.method == 'POST':
+        invited_id = request.form.get('invited_party_id')
+        if not user_party:
+            flash("Only party founders can propose coalitions!", "danger")
+            return redirect(url_for('coalition_page'))
+
+        proposal = CoalitionProposal(
+            proposer_party_id=user_party.id,
+            invited_party_id=invited_id
+        )
+        db.session.add(proposal)
+        db.session.commit()
+        flash("Coalition proposal sent!", "success")
+        return redirect(url_for('coalition_page'))
+
+    return render_template("coalition.html",
+                           proposals=proposals,
+                           parties=parties,
+                           user_party=user_party)
+
+
+@app.route('/coalition/respond/<int:proposal_id>/<action>', methods=['POST'])
+@login_required
+def coalition_respond(proposal_id, action):
+    proposal = CoalitionProposal.query.get_or_404(proposal_id)
+    invited_party = Party.query.get(proposal.invited_party_id)
+
+    if not invited_party or invited_party.founder_id != g.user.id:
+        abort(403)
+
+    if action == "accept":
+        proposal.status = "accepted"
+    elif action == "reject":
+        proposal.status = "rejected"
+
+    db.session.commit()
+    flash(f"Proposal {action}ed!", "info")
+    return redirect(url_for('coalition_page'))
+
+
+@app.route('/bill/propose', methods=['GET', 'POST'])
+@login_required
+def propose_bill():
+    party = Party.query.filter_by(founder_id=g.user.id, is_in_government=True).first()
+    if not party:
+        flash("Only government party leaders can propose bills!", "danger")
+        return redirect(url_for('riksdag'))
+
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        bill = Bill(title=title, content=content, proposer_party_id=party.id)
+        db.session.add(bill)
+        db.session.commit()
+        flash("Bill proposed!", "success")
+        return redirect(url_for('bill_detail', bill_id=bill.id))
+
+    return render_template("bill_propose.html")
+
+@app.route('/bill/<int:bill_id>', methods=['GET', 'POST'])
+@login_required
+def bill_detail(bill_id):
+    bill = Bill.query.get_or_404(bill_id)
+    party = Party.query.filter_by(founder_id=g.user.id).first()
+
+    if request.method == 'POST':
+        if not party:
+            flash("Only party leaders can vote!", "danger")
+            return redirect(url_for('bill_detail', bill_id=bill.id))
+
+        existing_vote = BillVote.query.filter_by(bill_id=bill.id, party_id=party.id).first()
+        if existing_vote:
+            flash("Your party already voted!", "warning")
+            return redirect(url_for('bill_detail', bill_id=bill.id))
+
+        choice = request.form.get("vote")
+        new_vote = BillVote(bill_id=bill.id, party_id=party.id, vote_choice=choice)
+        db.session.add(new_vote)
+        db.session.commit()
+        flash("Vote submitted!", "success")
+
+    votes = BillVote.query.filter_by(bill_id=bill.id).all()
+    return render_template("bill_detail.html", bill=bill, votes=votes)
+
+@app.route('/bills')
+@login_required
+def bills_list():
+    bills = Bill.query.all()
+    return render_template("bills_list.html", bills=bills)
+
+@app.route('/constitutions')
+@login_required
+def constitution_list():
+    constitutions = Constitution.query.all()
+    return render_template("constitution_list.html", constitutions=constitutions)
+
+@app.route('/constitution/propose', methods=['GET', 'POST'])
+@login_required
+def propose_constitution():
+    party = Party.query.filter_by(founder_id=g.user.id, is_in_government=True).first()
+    if not party:
+        flash("Only government parties can propose amendments!", "danger")
+        return redirect(url_for('riksdag'))
+
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        new_const = Constitution(
+            title=title,
+            content=content,
+            proposed_by_party_id=party.id,
+            first_vote_date=datetime.utcnow()
+        )
+        db.session.add(new_const)
+        db.session.commit()
+        flash("Amendment proposed!", "success")
+        return redirect(url_for('constitution_detail', const_id=new_const.id))
+
+    return render_template("constitution_propose.html")
+
+@app.route('/constitution/<int:const_id>', methods=['GET', 'POST'])
+@login_required
+def constitution_detail(const_id):
+    const = Constitution.query.get_or_404(const_id)
+    party = Party.query.filter_by(founder_id=g.user.id).first()
+
+    if request.method == 'POST':
+        phase = request.form.get("phase")  # "first" or "final"
+        choice = request.form.get("vote")
+
+        existing_vote = ConstitutionVote.query.filter_by(
+            constitution_id=const.id, party_id=party.id, phase=phase
+        ).first()
+
+        if existing_vote:
+            flash("Your party already voted!", "warning")
+        else:
+            new_vote = ConstitutionVote(
+                constitution_id=const.id,
+                party_id=party.id,
+                vote_choice=choice,
+                phase=phase
+            )
+            db.session.add(new_vote)
+            db.session.commit()
+            flash("Vote submitted!", "success")
+
+    votes = ConstitutionVote.query.filter_by(constitution_id=const.id).all()
+    return render_template("constitution_detail.html", const=const, votes=votes)
+
+
 
 def calculate_riksdag_seats():
     total_votes = db.session.query(func.count(Vote.id)).scalar() or 0

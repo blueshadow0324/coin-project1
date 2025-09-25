@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Constitutional Amendments</h2>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Proposer</th>
+      <th>First Vote</th>
+      <th>Final Vote</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in constitutions %}
+    <tr>
+      <td>{{ c.title }}</td>
+      <td>Party {{ c.proposed_by_party_id }}</td>
+      <td>
+        {% if c.first_vote_passed %}
+          ✅ Passed ({{ c.first_vote_date.strftime('%Y-%m-%d') if c.first_vote_date else '' }})
+        {% else %}
+          ❌ Pending
+        {% endif %}
+      </td>
+      <td>
+        {% if c.final_vote_passed %}
+          ✅ Passed ({{ c.final_vote_date.strftime('%Y-%m-%d') if c.final_vote_date else '' }})
+        {% else %}
+          {% if c.first_vote_passed %}
+            ⏳ Waiting (opens {{ c.final_vote_date.strftime('%Y-%m-%d') if c.final_vote_date else '' }})
+          {% else %}
+            ❌ Not started
+          {% endif %}
+        {% endif %}
+      </td>
+      <td>
+        {% if c.final_vote_passed %}
+          <span class="badge bg-success">Amendment Passed</span>
+        {% elif c.first_vote_passed %}
+          <span class="badge bg-warning">In Final Vote</span>
+        {% else %}
+          <span class="badge bg-secondary">In First Vote</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('constitution_detail', const_id=c.id) }}" class="btn btn-primary btn-sm">View & Vote</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

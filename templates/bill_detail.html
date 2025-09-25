@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ bill.title }}</h2>
+<p>{{ bill.content }}</p>
+
+<form method="post">
+  <button name="vote" value="yes" class="btn btn-success">Yes</button>
+  <button name="vote" value="no" class="btn btn-danger">No</button>
+  <button name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+</form>
+
+<h3>Votes</h3>
+<ul>
+  {% for v in votes %}
+    <li>Party {{ v.party_id }}: {{ v.vote_choice }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}

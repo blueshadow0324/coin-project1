@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ const.title }}</h2>
+<p>{{ const.content }}</p>
+
+<h3>Cast Vote</h3>
+<form method="post">
+  <input type="hidden" name="phase" value="first">
+  <button name="vote" value="yes" class="btn btn-success">Yes (First Vote)</button>
+  <button name="vote" value="no" class="btn btn-danger">No (First Vote)</button>
+  <button name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+</form>
+
+<form method="post">
+  <input type="hidden" name="phase" value="final">
+  <button name="vote" value="yes" class="btn btn-success">Yes (Final Vote)</button>
+  <button name="vote" value="no" class="btn btn-danger">No (Final Vote)</button>
+  <button name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+</form>
+
+<h3>Votes</h3>
+<ul>
+  {% for v in votes %}
+    <li>Party {{ v.party_id }} ({{ v.phase }}): {{ v.vote_choice }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}
