@@ -46,6 +46,27 @@ from sqlalchemy import inspect, text
 with app.app_context():
     inspector = inspect(db.engine)
 
+     # --- Constitution table ---
+    const_columns = [col["name"] for col in inspector.get_columns("constitution")]
+
+    if "first_vote_deadline" not in const_columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP")
+            )
+        print("✅ Column 'first_vote_deadline' added to constitution.")
+    else:
+        print("ℹ️ Column 'first_vote_deadline' already exists.")
+
+    if "final_vote_deadline" not in const_columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP")
+            )
+        print("✅ Column 'final_vote_deadline' added to constitution.")
+    else:
+        print("ℹ️ Column 'final_vote_deadline' already exists.")
+
     # --- For bill table ---
     bill_columns = [col["name"] for col in inspector.get_columns("bill")]
 
