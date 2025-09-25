@@ -1253,12 +1253,17 @@ class Vote(db.Model):
     week_start = db.Column(db.Date, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+from datetime import datetime, timedelta
+
 class Bill(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200))
     content = db.Column(db.Text)
     proposer_party_id = db.Column(db.Integer, db.ForeignKey('party.id'))
     passed = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    vote_deadline = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(hours=12))
+
 
 class CoalitionProposal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1740,6 +1745,9 @@ class Constitution(db.Model):
     final_vote_passed = db.Column(db.Boolean, default=False)
     first_vote_date = db.Column(db.DateTime)
     final_vote_date = db.Column(db.DateTime)
+    first_vote_deadline = db.Column(db.DateTime)
+    final_vote_deadline = db.Column(db.DateTime)
+
 
 from datetime import datetime, timedelta
 
