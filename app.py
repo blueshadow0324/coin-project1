@@ -66,7 +66,8 @@ def safe_create_tables():
         if model.__tablename__ not in existing_tables:
             model.__table__.create(db.engine)
             print(f"Created missing table: {model.__tablename__}")
-@app.before_first_request
+
+@app.before_request
 def init_db():
     safe_create_tables()
 
