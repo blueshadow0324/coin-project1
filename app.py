@@ -1886,6 +1886,24 @@ def form_government_self():
         flash("You do not have a majority. Coalition required.", "warning")
 
     return redirect(url_for('riksdag'))
+
+@app.route("/admin/migrate_bills")
+def migrate_bills():
+    from sqlalchemy import text
+    with db.engine.connect() as conn:
+        # Add missing columns if they don’t exist
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
+        except Exception as e:
+            print("created_at exists:", e)
+
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("vote_deadline exists:", e)
+
+    return "✅ Migration complete for Bill table"
+
 @app.route('/admin/force_government/<int:party_id>', methods=['POST'])
 @login_required
 def admin_force_government(party_id):
