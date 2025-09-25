@@ -1902,27 +1902,40 @@ def admin_force_government(party_id):
     return redirect(url_for('riksdag'))
 
 from sqlalchemy import text
+from flask import flash
+from flask_login import login_required, g
 
-@app.route("/admin/migrate_bill_table")
+@app.route("/admin/migrate_tables", methods=['GET'])
 @login_required
-def migrate_bill_table():
+def migrate_tables():
     if not g.user or g.user.username != "ADMIN_USERNAME":
         return "Forbidden", 403
 
     with db.engine.connect() as conn:
-        # Add created_at if missing
+        # Bill table
         try:
             conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
         except Exception as e:
-            print("created_at exists:", e)
+            print("bill.created_at exists:", e)
 
-        # Add vote_deadline if missing
         try:
             conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
         except Exception as e:
-            print("vote_deadline exists:", e)
+            print("bill.vote_deadline exists:", e)
 
-    return "✅ Bill table migrated successfully"
+        # Constitution table
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.first_vote_deadline exists:", e)
+
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.final_vote_deadline exists:", e)
+
+    return "✅ Migration complete for Bill and Constitution tables"
+
 
 
 if __name__ == '__main__':
