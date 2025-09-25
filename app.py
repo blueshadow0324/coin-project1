@@ -1901,22 +1901,29 @@ def admin_force_government(party_id):
     flash(f"Admin has forced {party.name} to form government ✅", "success")
     return redirect(url_for('riksdag'))
 
-@app.route("/admin/migrate_bills")
-def migrate_bills():
-    from sqlalchemy import text
+from sqlalchemy import text
+
+@app.route("/admin/migrate_bill_table")
+@login_required
+def migrate_bill_table():
+    if not g.user or g.user.username != "ADMIN_USERNAME":
+        return "Forbidden", 403
+
     with db.engine.connect() as conn:
-        # Add missing columns if they don’t exist
+        # Add created_at if missing
         try:
             conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
         except Exception as e:
             print("created_at exists:", e)
 
+        # Add vote_deadline if missing
         try:
             conn.execute(text('ALTER TABLE bill ADD COLUMN vote_deadline TIMESTAMP'))
         except Exception as e:
             print("vote_deadline exists:", e)
 
-    return "✅ Migration complete for Bill table"
+    return "✅ Bill table migrated successfully"
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
