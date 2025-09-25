@@ -1903,7 +1903,9 @@ def admin_force_government(party_id):
 
 from sqlalchemy import text
 from flask import flash
-from flask_login import login_required, g
+from flask import g, flash, redirect, url_for, request, abort, render_template
+from flask_login import login_required
+
 
 @app.route("/admin/migrate_tables", methods=['GET'])
 @login_required
