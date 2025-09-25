@@ -55,6 +55,21 @@ with app.app_context():  # ensures db is bound to the Flask app
         print("ℹ️ Column 'is_verified' already exists.")
 
 
+from sqlalchemy import inspect
+
+def safe_create_tables():
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+
+    # Only create missing tables
+    for model in [CoalitionProposal, BillVote, ConstitutionVote]:
+        if model.__tablename__ not in existing_tables:
+            model.__table__.create(db.engine)
+            print(f"Created missing table: {model.__tablename__}")
+@app.before_first_request
+def init_db():
+    safe_create_tables()
+
 
 
 # in your app.py
