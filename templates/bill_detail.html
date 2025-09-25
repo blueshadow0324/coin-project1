@@ -3,16 +3,50 @@
 <h2>{{ bill.title }}</h2>
 <p>{{ bill.content }}</p>
 
-<form method="post">
-  <button name="vote" value="yes" class="btn btn-success">Yes</button>
-  <button name="vote" value="no" class="btn btn-danger">No</button>
-  <button name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
-</form>
+<hr>
 
-<h3>Votes</h3>
+<h4>Live Vote Tally</h4>
+<div class="progress" style="height: 30px;">
+  <div class="progress-bar bg-success" role="progressbar"
+       style="width: {{ (yes_seats / total_seats) * 100 }}%"
+       aria-valuenow="{{ yes_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
+    YES {{ yes_seats }} seats
+  </div>
+  <div class="progress-bar bg-danger" role="progressbar"
+       style="width: {{ (no_seats / total_seats) * 100 }}%"
+       aria-valuenow="{{ no_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
+    NO {{ no_seats }} seats
+  </div>
+  <div class="progress-bar bg-secondary" role="progressbar"
+       style="width: {{ (abstain_seats / total_seats) * 100 }}%"
+       aria-valuenow="{{ abstain_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
+    Abstain {{ abstain_seats }} seats
+  </div>
+</div>
+
+<p class="mt-2">
+  Majority needed: {{ (total_seats // 2) + 1 }} seats
+</p>
+
+<hr>
+
+{% if g.user and g.user.party and g.user.id == g.user.party.founder_id %}
+<form method="post">
+  <button type="submit" name="vote" value="yes" class="btn btn-success">Vote YES</button>
+  <button type="submit" name="vote" value="no" class="btn btn-danger">Vote NO</button>
+  <button type="submit" name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+</form>
+{% else %}
+<p><em>Only party leaders can vote on bills.</em></p>
+{% endif %}
+
+<hr>
+
+<h5>Party Votes</h5>
 <ul>
   {% for v in votes %}
-    <li>Party {{ v.party_id }}: {{ v.vote_choice }}</li>
+    <li>Party {{ v.party_id }} voted {{ v.vote_choice|capitalize }}</li>
   {% endfor %}
 </ul>
+
 {% endblock %}

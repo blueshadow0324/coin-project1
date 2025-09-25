@@ -1355,19 +1355,38 @@ def bill_detail(bill_id):
             flash("Only party leaders can vote!", "danger")
             return redirect(url_for('bill_detail', bill_id=bill.id))
 
-        existing_vote = BillVote.query.filter_by(bill_id=bill.id, party_id=party.id).first()
-        if existing_vote:
-            flash("Your party already voted!", "warning")
-            return redirect(url_for('bill_detail', bill_id=bill.id))
-
         choice = request.form.get("vote")
-        new_vote = BillVote(bill_id=bill.id, party_id=party.id, vote_choice=choice)
-        db.session.add(new_vote)
-        db.session.commit()
-        flash("Vote submitted!", "success")
+        vote_on_bill(bill.id, {party.id: choice})
+        flash("Your vote has been recorded.", "success")
+        return redirect(url_for('bill_detail', bill_id=bill.id))
 
+    # ✅ tally votes with seat weights
     votes = BillVote.query.filter_by(bill_id=bill.id).all()
-    return render_template("bill_detail.html", bill=bill, votes=votes)
+    seat_distribution = calculate_riksdag_seats()
+    seat_map = {p["id"]: p["seats"] for p in seat_distribution}
+
+    yes_seats, no_seats, abstain_seats = 0, 0, 0
+    for v in votes:
+        seats = seat_map.get(v.party_id, 0)
+        if v.vote_choice == "yes":
+            yes_seats += seats
+        elif v.vote_choice == "no":
+            no_seats += seats
+        elif v.vote_choice == "abstain":
+            abstain_seats += seats
+
+    total_seats = sum(seat_map.values())
+
+    return render_template(
+        "bill_detail.html",
+        bill=bill,
+        yes_seats=yes_seats,
+        no_seats=no_seats,
+        abstain_seats=abstain_seats,
+        total_seats=total_seats,
+        votes=votes,
+    )
+
 
 @app.route('/bills')
 @login_required
