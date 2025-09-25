@@ -126,7 +126,7 @@ def load_logged_in_user():
 def inject_globals():
     return {
         'user': getattr(g, 'user', None),
-        'now': datetime.now
+        'now': datetime.now()
     }
 
 # -----------------------
