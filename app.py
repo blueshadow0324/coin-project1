@@ -1860,6 +1860,19 @@ def form_government_self():
         flash("You do not have a majority. Coalition required.", "warning")
 
     return redirect(url_for('riksdag'))
+@app.route('/admin/force_government/<int:party_id>', methods=['POST'])
+@login_required
+def admin_force_government(party_id):
+    if g.user.username != ADMIN_USERNAME:
+        flash("Admins only!", "danger")
+        return redirect(url_for('riksdag'))
+
+    party = Party.query.get_or_404(party_id)
+    party.is_in_government = True
+    db.session.commit()
+
+    flash(f"Admin has forced {party.name} to form government ✅", "success")
+    return redirect(url_for('riksdag'))
 
 
 
