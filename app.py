@@ -49,7 +49,7 @@ with app.app_context():
     if "created_at" not in bill_columns:
         with db.engine.begin() as conn:
             conn.execute(
-                text('ALTER TABLE bill ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP')
+                text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
             )
         print("✅ Column 'created_at' added to bill.")
     else:
