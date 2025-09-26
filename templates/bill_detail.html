@@ -34,15 +34,11 @@
 
 <hr>
 
-{% if g.user and g.user.party and g.user.id == g.user.party.founder_id %}
 <form method="post">
   <button type="submit" name="vote" value="yes" class="btn btn-success">Rösta Ja</button>
   <button type="submit" name="vote" value="no" class="btn btn-danger">Rösta Nej</button>
   <button type="submit" name="vote" value="abstain" class="btn btn-secondary">Avstå</button>
 </form>
-{% else %}
-<p><em>Bara parti ledare kan rösta på lagar.</em></p>
-{% endif %}
 
 <hr>
 
