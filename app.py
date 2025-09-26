@@ -163,7 +163,7 @@ with app.app_context():
 
     if "party_id" not in columns:
         with db.engine.begin() as conn:
-            conn.execute(text('ALTER TABLE "user" ADD COLUMN party_id INTEGER'))
+            conn.execute(text('"ALTER TABLE "user" ADD COLUMN party_id INTEGER'))
         print("✅ Added column party_id to user table")
     else:
         print("ℹ️ Column party_id already exists")
@@ -1326,7 +1326,7 @@ def propose_bill():
         db.session.add(bill)
         db.session.commit()
         flash("Bill proposed!", "success")
-        return redirect(url_for('bill_detail', bill_id=bill.id))
+        return redirect(url_for('bill_view', bill_id=bill.id))
 
     return render_template("bill_propose.html")
 
