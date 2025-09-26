@@ -593,7 +593,7 @@ def page_not_found(e):
     return render_template('404.html'), 404
 
 # --- Admin Routes (temporary for Render) ---
-ADMIN_USERNAME = "YOUR_ADMIN_USERNAME"  # change this
+ADMIN_USERNAME: str = "YOUR_ADMIN_USERNAME"  # change this
 
 # Add this to your app.py
 import os
@@ -1431,7 +1431,7 @@ def bills_list():
             "votes": vote_display
         })
 
-    return render_template("bills_list.html", results=results)
+    return render_template("bills_list.html", results=results, ADMIN_USERNAME=ADMIN_USERNAME)
 
 
 @app.route('/constitutions')
