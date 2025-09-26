@@ -104,7 +104,7 @@ class MarketplaceItem(db.Model):
 
     seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
     buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
-
+Z
 # -----------------------
 # Before request
 # -----------------------
@@ -171,14 +171,6 @@ def index():
     if getattr(g, 'user', None):
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
-
-# -----------------------
-# Run the app (optional)
-# -----------------------
-# if __name__ == '__main__':
-#     app.run(debug=True)
-
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -1313,56 +1305,48 @@ def propose_bill():
 
     return render_template("bill_propose.html")
 
-@app.route('/bill/<int:bill_id>', methods=['GET', 'POST'])
-@login_required
-def bill_detail(bill_id):
+@app.route("/bill/<int:bill_id>", methods=["GET", "POST"])
+def bill_view(bill_id):
     bill = Bill.query.get_or_404(bill_id)
-    party = Party.query.filter_by(founder_id=g.user.id).first()
 
-    if request.method == 'POST':
-        if not party:
-            flash("Only party leaders can vote!", "danger")
-            return redirect(url_for('bill_detail', bill_id=bill.id))
+    if request.method == "POST" and g.user:
+        vote_choice = request.form.get("vote")
+        if vote_choice in ["yes", "no", "abstain"]:
+            # Check if the user already voted
+            existing_vote = BillVote.query.filter_by(
+                bill_id=bill.id, party_id=g.user.party_id
+            ).first()
 
-        choice = request.form.get("vote")
-        vote_on_bill(bill.id, {party.id: choice})
-        flash("Your vote has been recorded.", "success")
-        return redirect(url_for('bill_detail', bill_id=bill.id))
+            if existing_vote:
+                existing_vote.vote_choice = vote_choice  # update vote
+            else:
+                new_vote = BillVote(
+                    bill_id=bill.id,
+                    party_id=g.user.party_id,
+                    vote_choice=vote_choice
+                )
+                db.session.add(new_vote)
 
-    from datetime import datetime
+            db.session.commit()
+            flash("Din röst har sparats!", "success")
+            return redirect(url_for("bill_view", bill_id=bill.id))
 
-    if request.method == 'POST':
-      if datetime.utcnow() > bill.vote_deadline:
-        flash("Voting period for this bill has ended.", "danger")
-        return redirect(url_for('bill_detail', bill_id=bill.id))
+    # --- for displaying progress ---
+    yes_seats = BillVote.query.filter_by(bill_id=bill.id, vote_choice="yes").count()
+    no_seats = BillVote.query.filter_by(bill_id=bill.id, vote_choice="no").count()
+    abstain_seats = BillVote.query.filter_by(bill_id=bill.id, vote_choice="abstain").count()
+    total_seats = yes_seats + no_seats + abstain_seats or 1  # avoid division by zero
 
-    # Record vote normally
-
-    # ✅ tally votes with seat weights
     votes = BillVote.query.filter_by(bill_id=bill.id).all()
-    seat_distribution = calculate_riksdag_seats()
-    seat_map = {p["id"]: p["seats"] for p in seat_distribution}
-
-    yes_seats, no_seats, abstain_seats = 0, 0, 0
-    for v in votes:
-        seats = seat_map.get(v.party_id, 0)
-        if v.vote_choice == "yes":
-            yes_seats += seats
-        elif v.vote_choice == "no":
-            no_seats += seats
-        elif v.vote_choice == "abstain":
-            abstain_seats += seats
-
-    total_seats = sum(seat_map.values())
 
     return render_template(
-        "bill_detail.html",
+        "bill_view.html",
         bill=bill,
         yes_seats=yes_seats,
         no_seats=no_seats,
         abstain_seats=abstain_seats,
         total_seats=total_seats,
-        votes=votes,
+        votes=votes
     )
 
 
