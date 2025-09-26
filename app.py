@@ -1611,10 +1611,6 @@ def end_vote():
     flash("Voting ended. Results have been calculated!", "info")
     return render_template("riksdag.html", results=results)
 
-    flash("Voting has been reset!", "info")
-    return render_template("riksdag.html")
-
-
 @app.route("/admin/backfill_party_ids")
 @login_required
 def backfill_party_ids():
