@@ -104,7 +104,7 @@ class MarketplaceItem(db.Model):
 
     seller = db.relationship("User", foreign_keys=[seller_id], backref="items_sold")
     buyer = db.relationship("User", foreign_keys=[buyer_id], backref="items_bought")
-Z
+
 # -----------------------
 # Before request
 # -----------------------
