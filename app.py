@@ -1243,6 +1243,7 @@ class BillVote(db.Model):
     party_id = db.Column(db.Integer, db.ForeignKey('party.id'), nullable=False)
     vote_choice = db.Column(db.String(10), nullable=False)  # "yes", "no", "abstain"
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    party = db.relationship("Party")
 
 class ConstitutionVote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1332,7 +1333,7 @@ def propose_bill():
 
 @app.route("/bill/<int:bill_id>", methods=["GET", "POST"])
 @login_required
-def bill_view(bill_id):
+def bill_detail(bill_id):
     bill = Bill.query.get_or_404(bill_id)
 
     # Handle POST vote
@@ -1354,16 +1355,31 @@ def bill_view(bill_id):
                 db.session.add(new_vote)
             db.session.commit()
             flash("Din röst har sparats!", "success")
-            return redirect(url_for("bill_view", bill_id=bill.id))
+            return redirect(url_for("bill_detail", bill_id=bill.id))
 
-    # --- Compute votes ---
+    # --- Gather votes with party info ---
     votes = BillVote.query.filter_by(bill_id=bill.id).all()
-    yes_seats = sum(v.party.seats for v in votes if v.vote_choice == "yes")
-    no_seats = sum(v.party.seats for v in votes if v.vote_choice == "no")
-    abstain_seats = sum(v.party.seats for v in votes if v.vote_choice == "abstain")
-    total_seats = sum(p.seats for p in calculate_riksdag_seats())
+    riksdag_results = calculate_riksdag_seats()
+    seats_by_party = {p["id"]: p["seats"] for p in riksdag_results}
+    party_names = {p["id"]: p["party"] for p in riksdag_results}
 
-    # Determine status
+    # Convert votes to dicts with party_name and seats
+    votes_list = []
+    for v in votes:
+        votes_list.append({
+            "party_id": v.party_id,
+            "party_name": party_names.get(v.party_id, f"Party {v.party_id}"),
+            "vote_choice": v.vote_choice,
+            "seats": seats_by_party.get(v.party_id, 0)
+        })
+
+    # Calculate seat counts
+    yes_seats = sum(v["seats"] for v in votes_list if v["vote_choice"] == "yes")
+    no_seats = sum(v["seats"] for v in votes_list if v["vote_choice"] == "no")
+    abstain_seats = sum(v["seats"] for v in votes_list if v["vote_choice"] == "abstain")
+    total_seats = sum(p["seats"] for p in riksdag_results)
+
+    # Determine bill status
     now = datetime.utcnow()
     if now > bill.vote_deadline or yes_seats > total_seats / 2 or no_seats >= total_seats / 2:
         if yes_seats > no_seats:
@@ -1376,13 +1392,14 @@ def bill_view(bill_id):
     return render_template(
         "bill_detail.html",
         bill=bill,
-        votes=votes,
+        votes=votes_list,
         bill_status=bill_status,
         yes_seats=yes_seats,
         no_seats=no_seats,
         abstain_seats=abstain_seats,
         total_seats=total_seats
     )
+
 
 
 
