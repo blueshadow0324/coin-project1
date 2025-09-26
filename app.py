@@ -1512,6 +1512,7 @@ def create_party():
             return redirect(url_for('create_party'))
 
         new_party = Party(name=name, founder_id=g.user.id)
+        g.user.party_id = new_party.id
         db.session.add(new_party)
         g.user.coins -= 1000
         db.session.commit()
@@ -1609,6 +1610,35 @@ def end_vote():
 
     flash("Voting ended. Results have been calculated!", "info")
     return render_template("riksdag.html", results=results)
+
+@app.route('/admin/end_vote', methods=['POST'])
+@login_required
+def end_vote():
+    if g.user.username != ADMIN_USERNAME:
+        flash("Admins only!", "danger")
+        return redirect(url_for('riksdag'))
+    db.session.query(Vote).delete()
+    db.session.commit()
+
+    flash("Voting has been reset!", "info")
+    return render_template("riksdag.html")
+
+
+@app.route("/admin/backfill_party_ids")
+@login_required
+def backfill_party_ids():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    users = User.query.all()
+    for user in users:
+        if not user.party_id:
+            party = Party.query.filter_by(founder_id=user.id).first()
+            if party:
+                user.party_id = party.id
+    db.session.commit()
+    return "Backfill complete ✅"
+
 
 @app.route('/verify', methods=['GET', 'POST'])
 @login_required
