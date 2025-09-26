@@ -1228,6 +1228,7 @@ class Bill(db.Model):
     passed = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     vote_deadline = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(hours=12))
+    proposer_party = db.relationship("Party", foreign_keys=[proposer_party_id])
 
 
 class CoalitionProposal(db.Model):
@@ -1386,9 +1387,6 @@ def bill_view(bill_id):
         abstain_seats=abstain_seats,
         total_seats=total_seats
     )
-
-
-
 
 
 @app.route('/bills')

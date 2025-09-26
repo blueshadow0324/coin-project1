@@ -15,7 +15,7 @@
     {% for r in results %}
     <tr>
       <td>{{ r.bill.title }}</td>
-      <td>Party {{ r.bill.proposer_party_id }}</td>
+      <td>{{ r.bill.proposer_party.name if r.bill.proposer_party else "Unknown" }}</td>
       <td>
         {% if r.status == "passed" %}
           <span class="badge bg-success">Passed</span>
