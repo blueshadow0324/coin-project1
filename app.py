@@ -44,13 +44,11 @@ class User(db.Model):
     verification_request_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    sent_transactions = db.relationship("Transaction", foreign_keys="Transaction.sender_id", backref="sender", lazy=True)
-    received_transactions = db.relationship("Transaction", foreign_keys="Transaction.receiver_id", backref="receiver", lazy=True)
-    messages = db.relationship("Message", backref="user", lazy=True)
-    snake_scores = db.relationship("SnakeScore", backref="user", lazy=True)
-    flappy_scores = db.relationship("FlappyScore", backref="user", lazy=True)
-    party_id = db.Column(db.Integer, db.ForeignKey("party.id"), nullable=True)  # <-- ADD THIS
-    party = db.relationship("Party", backref="members")
+    # Foreign key for party membership
+    party_id = db.Column(db.Integer, db.ForeignKey("party.id"), nullable=True)
+
+    # Explicitly link User.party to User.party_id
+    party = db.relationship("Party", foreign_keys=[party_id], backref="members")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -143,6 +141,17 @@ with app.app_context():
             conn.execute(text('ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
         if 'verification_request_at' not in user_columns:
             conn.execute(text('ALTER TABLE user ADD COLUMN verification_request_at DATETIME'))
+
+with app.app_context():
+    inspector = inspect(db.engine)
+    columns = [c["name"] for c in inspector.get_columns("user")]
+
+    if "party_id" not in columns:
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE user ADD COLUMN party_id INTEGER"))
+        print("✅ Added column party_id to user table")
+    else:
+        print("ℹ️ Column party_id already exists")
 
 # -----------------------
 # Utility / decorators
@@ -1180,13 +1189,16 @@ def update_avatar():
     return redirect(url_for('profile', username=g.user.username))
 
 class Party(db.Model):
+    __tablename__ = "party"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False)
-    founder_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    founder_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    founder = db.relationship("User", foreign_keys=[founder_id], backref="founded_parties")
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    members = db.relationship("User", backref="party", lazy=True)
-    # Track coalition government
     is_in_government = db.Column(db.Boolean, default=False)
+
 
 class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
