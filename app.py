@@ -1377,7 +1377,7 @@ def bill_view(bill_id):
         bill_status = "not voted"
 
     return render_template(
-        "bill_detail.html",
+        "bill_view.html",
         bill=bill,
         votes=votes,
         bill_status=bill_status,
