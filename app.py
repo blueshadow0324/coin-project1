@@ -1632,23 +1632,30 @@ def assign_user_party():
     if g.user.username != ADMIN_USERNAME:
         abort(403)
 
-    user_id = request.form.get("user_id")
-    party_id = request.form.get("party_id")
+    username = request.form.get("username")
+    partyname = request.form.get("partyname")
 
-    if not user_id or not party_id:
-        return "Missing user_id or party_id", 400
+    if not username or not partyname:
+        flash("Username and Party Name are required!", "danger")
+        return redirect(url_for("assign_user_form"))
 
-    user = User.query.get(user_id)
-    party = Party.query.get(party_id)
+    user = User.query.filter_by(username=username).first()
+    party = Party.query.filter_by(name=partyname).first()
 
-    if not user or not party:
-        return "User or Party not found", 404
+    if not user:
+        flash(f"No user found with username '{username}'", "danger")
+        return redirect(url_for("assign_user_form"))
 
-    # Assign the user to the party
+    if not party:
+        flash(f"No party found with name '{partyname}'", "danger")
+        return redirect(url_for("assign_user_form"))
+
     user.party_id = party.id
     db.session.commit()
 
-    return f"User {user.username} assigned to party {party.name} ✅"
+    flash(f"User '{username}' has been assigned to party '{partyname}' ✅", "success")
+    return redirect(url_for("assign_user_form"))
+
 
 @app.route("/admin/assign_user_form")
 @login_required
