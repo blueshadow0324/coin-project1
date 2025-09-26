@@ -34,6 +34,34 @@ db = SQLAlchemy(app)
 # -----------------------
 # Models
 # -----------------------
+#
+
+class SnakeScore(db.Model):
+    __tablename__ = "snake_scores"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+
+
+class FlappyScore(db.Model):
+    __tablename__ = "flappy_scores"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+
+class DinoScore(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+
+class DinoReward(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, unique=True, nullable=False)
+    distributed = db.Column(db.Boolean, default=False)
+
 class User(db.Model):
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
@@ -43,6 +71,9 @@ class User(db.Model):
     is_verified = db.Column(db.Boolean, default=False)
     verification_request_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    snake_scores = db.relationship("SnakeScore", backref="user", lazy=True)
+    flappy_scores = db.relationship("FlappyScore", backref="user", lazy=True)
+    dino_scores = db.relationship("DinoScore", backref="user", lazy=True)
 
     # Foreign key for party membership
     party_id = db.Column(db.Integer, db.ForeignKey("party.id"), nullable=True)
@@ -72,22 +103,6 @@ class Message(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class SnakeScore(db.Model):
-    __tablename__ = "snake_scores"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False, index=True)
-
-
-class FlappyScore(db.Model):
-    __tablename__ = "flappy_scores"
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False, index=True)
 
 
 class MarketplaceItem(db.Model):
@@ -152,6 +167,13 @@ with app.app_context():
         print("✅ Added column party_id to user table")
     else:
         print("ℹ️ Column party_id already exists")
+
+with app.app_context():
+    inspector = inspect(db.engine)
+    if "snake_scores" not in inspector.get_table_names():
+        SnakeScore.__table__.create(db.engine)
+        print("✅ Created snake_scores table")
+
 
 # -----------------------
 # Utility / decorators
@@ -1042,17 +1064,6 @@ def download_db_backup():
 
     # Return file for download
     return send_file(backup_file, as_attachment=True, download_name="viggo_db_backup.dump")
-
-class DinoScore(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    score = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False, index=True)
-
-class DinoReward(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, unique=True, nullable=False)
-    distributed = db.Column(db.Boolean, default=False)
 
 
 @app.route('/dino')
