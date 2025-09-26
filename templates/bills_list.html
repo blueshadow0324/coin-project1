@@ -24,7 +24,7 @@
         {% endif %}
       </td>
       <td>
-        <a href="{{ url_for('bill_detail', bill_id=b.id) }}">Visa & Rösta för Lagen</a>
+        <a href="{{ url_for('bill_view', bill_id=b.id) }}">Visa & Rösta för Lagen</a>
       </td>
     </tr>
     {% endfor %}
