@@ -153,9 +153,9 @@ with app.app_context():
     user_columns = [col['name'] for col in inspector.get_columns('user')]
     with db.engine.begin() as conn:
         if 'is_verified' not in user_columns:
-            conn.execute(text('ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
+            conn.execute(text('ALTER TABLE "user" ADD COLUMN is_verified BOOLEAN DEFAULT FALSE'))
         if 'verification_request_at' not in user_columns:
-            conn.execute(text('ALTER TABLE user ADD COLUMN verification_request_at DATETIME'))
+            conn.execute(text('ALTER TABLE "user" ADD COLUMN verification_request_at DATETIME'))
 
 with app.app_context():
     inspector = inspect(db.engine)
@@ -163,7 +163,7 @@ with app.app_context():
 
     if "party_id" not in columns:
         with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE user ADD COLUMN party_id INTEGER"))
+            conn.execute(text('ALTER TABLE "user" ADD COLUMN party_id INTEGER'))
         print("✅ Added column party_id to user table")
     else:
         print("ℹ️ Column party_id already exists")
