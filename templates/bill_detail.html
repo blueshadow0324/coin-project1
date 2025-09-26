@@ -34,11 +34,16 @@
 
 <hr>
 
+{% if g.user and g.user.party %}
 <form method="post">
   <button type="submit" name="vote" value="yes" class="btn btn-success">Rösta Ja</button>
   <button type="submit" name="vote" value="no" class="btn btn-danger">Rösta Nej</button>
   <button type="submit" name="vote" value="abstain" class="btn btn-secondary">Avstå</button>
 </form>
+{% else %}
+<p><em>Bara användare som tillhör ett parti kan rösta.</em></p>
+{% endif %}
+
 
 <hr>
 
