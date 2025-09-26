@@ -1626,6 +1626,37 @@ def backfill_party_ids():
     db.session.commit()
     return "Backfill complete ✅"
 
+@app.route("/admin/assign_user_party", methods=["POST"])
+@login_required
+def assign_user_party():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    user_id = request.form.get("user_id")
+    party_id = request.form.get("party_id")
+
+    if not user_id or not party_id:
+        return "Missing user_id or party_id", 400
+
+    user = User.query.get(user_id)
+    party = Party.query.get(party_id)
+
+    if not user or not party:
+        return "User or Party not found", 404
+
+    # Assign the user to the party
+    user.party_id = party.id
+    db.session.commit()
+
+    return f"User {user.username} assigned to party {party.name} ✅"
+
+@app.route("/admin/assign_user_form")
+@login_required
+def assign_user_form():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+    return render_template("admin_assign_user.html")
+
 
 @app.route('/verify', methods=['GET', 'POST'])
 @login_required

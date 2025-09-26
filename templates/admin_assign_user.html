@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Assign User to Party</h2>
+
+<form method="POST" action="{{ url_for('assign_user_party') }}">
+    <label>User ID:</label>
+    <input type="number" name="user_id" placeholder="User ID" required>
+    
+    <label>Party ID:</label>
+    <input type="number" name="party_id" placeholder="Party ID" required>
+    
+    <button type="submit" class="btn btn-primary">Assign User to Party</button>
+</form>
+{% endblock %}
