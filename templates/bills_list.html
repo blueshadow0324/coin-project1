@@ -33,6 +33,13 @@
           {% endfor %}
         </ul>
       </td>
+      <td>
+        {% if g.user.username == ADMIN_USERNAME %}
+           <form method="POST" action="{{ url_for('admin_delete_bill', bill_id=r.bill.id) }}" style="display:inline;">
+           <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this bill?');">Delete</button>
+           </form>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>

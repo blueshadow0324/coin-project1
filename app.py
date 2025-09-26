@@ -1983,6 +1983,25 @@ def form_government_self():
 
     return redirect(url_for('riksdag'))
 
+
+@app.route('/admin/delete_bill/<int:bill_id>', methods=['POST'])
+@login_required
+def admin_delete_bill(bill_id):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    bill = Bill.query.get_or_404(bill_id)
+
+    # Delete associated votes first to avoid foreign key issues
+    BillVote.query.filter_by(bill_id=bill.id).delete()
+
+    db.session.delete(bill)
+    db.session.commit()
+
+    flash(f"Bill '{bill.title}' has been deleted.", "info")
+    return redirect(url_for('bills_list'))
+
+
 @app.route('/admin/force_government/<int:party_id>', methods=['POST'])
 @login_required
 def admin_force_government(party_id):
