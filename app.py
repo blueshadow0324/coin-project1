@@ -1611,15 +1611,6 @@ def end_vote():
     flash("Voting ended. Results have been calculated!", "info")
     return render_template("riksdag.html", results=results)
 
-@app.route('/admin/end_vote', methods=['POST'])
-@login_required
-def end_vote():
-    if g.user.username != ADMIN_USERNAME:
-        flash("Admins only!", "danger")
-        return redirect(url_for('riksdag'))
-    db.session.query(Vote).delete()
-    db.session.commit()
-
     flash("Voting has been reset!", "info")
     return render_template("riksdag.html")
 
