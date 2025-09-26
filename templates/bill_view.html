@@ -1,7 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ bill.title }}</h2>
 <p>{{ bill.content }}</p>
+
+<h3>{{ bill.title }}</h3>
+<p>Status:
+    {% if bill_status == "passed" %}
+        <span class="badge bg-success">Passed</span>
+    {% elif bill_status == "failed" %}
+        <span class="badge bg-danger">Failed</span>
+    {% else %}
+        <span class="badge bg-warning">Not voted yet</span>
+    {% endif %}
+</p>
+
 
 <hr>
 
@@ -55,7 +66,7 @@
 <h5>Parti Röster</h5>
 <ul>
   {% for v in votes %}
-    <li>Party {{ v.party_id }} voted {{ v.vote_choice|capitalize }}</li>
+    <li>Party {{ v.party_name }} voted {{ v.vote_choice|capitalize }}</li>
   {% endfor %}
 </ul>
 

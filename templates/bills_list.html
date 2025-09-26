@@ -8,23 +8,30 @@
       <th>Title</th>
       <th>Parti</th>
       <th>Status</th>
-      <th>åtgärder</th>
+      <th>Åtgärder</th>
     </tr>
   </thead>
   <tbody>
-    {% for b in bills %}
+    {% for r in results %}
     <tr>
-      <td>{{ b.title }}</td>
-      <td>Party {{ b.proposer_party_id }}</td>
+      <td>{{ r.bill.title }}</td>
+      <td>Party {{ r.bill.proposer_party_id }}</td>
       <td>
-        {% if b.passed %}
-          <span class="badge bg-success">Godkänt</span>
+        {% if r.status == "passed" %}
+          <span class="badge bg-success">Passed</span>
+        {% elif r.status == "failed" %}
+          <span class="badge bg-danger">Failed</span>
         {% else %}
-          <span class="badge bg-warning">Pågående</span>
+          <span class="badge bg-warning">Not voted yet</span>
         {% endif %}
       </td>
       <td>
-        <a href="{{ url_for('bill_view', bill_id=b.id) }}">Visa & Rösta för Lagen</a>
+        <a href="{{ url_for('bill_view', bill_id=r.bill.id) }}">Visa & Rösta</a>
+        <ul>
+          {% for v in r.votes %}
+            <li>{{ v.party_name }} voted {{ v.vote_choice|capitalize }}</li>
+          {% endfor %}
+        </ul>
       </td>
     </tr>
     {% endfor %}
