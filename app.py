@@ -1190,6 +1190,7 @@ class Party(db.Model):
     name = db.Column(db.String(120), unique=True, nullable=False)
     founder_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    members = db.relationship("User", backref="party", lazy=True)
     # Track coalition government
     is_in_government = db.Column(db.Boolean, default=False)
 
