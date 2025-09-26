@@ -49,6 +49,8 @@ class User(db.Model):
     messages = db.relationship("Message", backref="user", lazy=True)
     snake_scores = db.relationship("SnakeScore", backref="user", lazy=True)
     flappy_scores = db.relationship("FlappyScore", backref="user", lazy=True)
+    party_id = db.Column(db.Integer, db.ForeignKey("party.id"), nullable=True)  # <-- ADD THIS
+    party = db.relationship("Party", backref="members")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
