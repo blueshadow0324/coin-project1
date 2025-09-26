@@ -10,18 +10,22 @@
   <div class="progress-bar bg-success" role="progressbar"
        style="width: {{ (yes_seats / total_seats) * 100 }}%"
        aria-valuenow="{{ yes_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
-    YES {{ yes_seats }} seats
   </div>
   <div class="progress-bar bg-danger" role="progressbar"
        style="width: {{ (no_seats / total_seats) * 100 }}%"
        aria-valuenow="{{ no_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
-    NO {{ no_seats }} seats
   </div>
   <div class="progress-bar bg-secondary" role="progressbar"
        style="width: {{ (abstain_seats / total_seats) * 100 }}%"
        aria-valuenow="{{ abstain_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
-    Abstain {{ abstain_seats }} seats
   </div>
+</div>
+
+<!-- Labels under the bars -->
+<div class="d-flex justify-content-between mt-1">
+  <small class="text-success">YES {{ yes_seats }} seats</small>
+  <small class="text-danger">NO {{ no_seats }} seats</small>
+  <small class="text-secondary">Abstain {{ abstain_seats }} seats</small>
 </div>
 
 <p class="mt-2">
@@ -44,7 +48,7 @@
 
 <p>
   Voting ends at: {{ bill.vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}<br>
-  Time remaining: {{ (bill.vote_deadline - now).total_seconds() // 3600 }} hours
+  Time remaining: {{ ((bill.vote_deadline - now).total_seconds() // 3600) | int }} hours
 </p>
 
 <h5>Parti Röster</h5>

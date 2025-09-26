@@ -3,40 +3,58 @@
 <h2>{{ const.title }}</h2>
 <p>{{ const.content }}</p>
 
-<h4>Voting Status</h4>
+<hr>
+
+<h4>Röstningsstatus</h4>
 
 {% if const.first_vote_passed %}
-  <p>✅ First vote passed.</p>
-  <p>Final vote scheduled at: {{ const.final_vote_date.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+  <p>✅ Första omröstningen gick igenom.</p>
+  <p>Slutomröstning planerad: {{ const.final_vote_date.strftime('%Y-%m-%d %H:%M UTC') }}</p>
   {% if const.final_vote_deadline %}
-    <p>Final vote ends at: {{ const.final_vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+    <p>Slutomröstning avslutas: {{ const.final_vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}</p>
   {% endif %}
 {% else %}
-  <p>🗳️ First vote ongoing.</p>
+  <p>🗳️ Första omröstningen pågår.</p>
   {% if const.first_vote_deadline %}
-    <p>First vote ends at: {{ const.first_vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+    <p>Första omröstningen avslutas: {{ const.first_vote_deadline.strftime('%Y-%m-%d %H:%M UTC') }}</p>
   {% endif %}
 {% endif %}
 
-<h3>Cast Vote</h3>
-<form method="post">
+<hr>
+
+<h3>Lägg din röst</h3>
+
+<!-- Första omröstning -->
+<form method="post" class="mb-3">
   <input type="hidden" name="phase" value="first">
-  <button name="vote" value="yes" class="btn btn-success">Yes (First Vote)</button>
-  <button name="vote" value="no" class="btn btn-danger">No (First Vote)</button>
-  <button name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+  <button name="vote" value="yes" class="btn btn-success">Ja (Första omröstning)</button>
+  <button name="vote" value="no" class="btn btn-danger">Nej (Första omröstning)</button>
+  <button name="vote" value="abstain" class="btn btn-secondary">Avstå</button>
 </form>
 
-<form method="post">
+<!-- Slutomröstning -->
+<form method="post" class="mb-3">
   <input type="hidden" name="phase" value="final">
-  <button name="vote" value="yes" class="btn btn-success">Yes (Final Vote)</button>
-  <button name="vote" value="no" class="btn btn-danger">No (Final Vote)</button>
-  <button name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
+  <button name="vote" value="yes" class="btn btn-success">Ja (Slutomröstning)</button>
+  <button name="vote" value="no" class="btn btn-danger">Nej (Slutomröstning)</button>
+  <button name="vote" value="abstain" class="btn btn-secondary">Avstå</button>
 </form>
 
-<h3>Votes</h3>
-<ul>
+<hr>
+
+<h3>Partiröster</h3>
+<ul class="list-group">
   {% for v in votes %}
-    <li>Party {{ v.party_id }} ({{ v.phase }}): {{ v.vote_choice }}</li>
+    <li class="list-group-item">
+      Parti {{ v.party_id }}
+      {% if v.phase == "first" %}
+        (Första omröstning):
+      {% else %}
+        (Slutomröstning):
+      {% endif %}
+      <strong>{{ v.vote_choice|capitalize }}</strong>
+    </li>
   {% endfor %}
 </ul>
+
 {% endblock %}
