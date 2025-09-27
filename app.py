@@ -1332,13 +1332,16 @@ def propose_bill():
 
     return render_template("bill_propose.html")
 
-@app.route("/bill/<int:bill_id>", methods=["GET", "POST"], endpoint="bill_view")
+@app.route("/bill/<int:bill_id>", methods=["GET", "POST"])
 @login_required
 def bill_view(bill_id):
     bill = Bill.query.get_or_404(bill_id)
 
-    # Handle POST vote
-    if request.method == "POST" and g.user:
+    now = datetime.utcnow()
+    expired = now > bill.vote_deadline if bill.vote_deadline else False
+
+    # Handle POST vote only if not expired
+    if request.method == "POST" and g.user and not expired:
         vote_choice = request.form.get("vote")
         if vote_choice in ["yes", "no", "abstain"]:
             existing_vote = BillVote.query.filter_by(
@@ -1360,16 +1363,15 @@ def bill_view(bill_id):
 
     # --- Compute votes ---
     votes = BillVote.query.filter_by(bill_id=bill.id).all()
-    riksdag_seats = {p['id']: p['seats'] for p in calculate_riksdag_seats()}
+    yes_seats = sum(v.party.seats for v in votes if v.vote_choice == "yes")
+    no_seats = sum(v.party.seats for v in votes if v.vote_choice == "no")
+    abstain_seats = sum(v.party.seats for v in votes if v.vote_choice == "abstain")
 
-    yes_seats = sum(riksdag_seats.get(v.party_id, 0) for v in votes if v.vote_choice == "yes")
-    no_seats = sum(riksdag_seats.get(v.party_id, 0) for v in votes if v.vote_choice == "no")
-    abstain_seats = sum(riksdag_seats.get(v.party_id, 0) for v in votes if v.vote_choice == "abstain")
-    total_seats = sum(riksdag_seats.values())
+    riksdag_results = calculate_riksdag_seats()
+    total_seats = sum(p["seats"] for p in riksdag_results)
 
-    # Determine status
-    now = datetime.utcnow()
-    if now > bill.vote_deadline or yes_seats > total_seats / 2 or no_seats >= total_seats / 2:
+    # Determine bill status
+    if expired or yes_seats > total_seats / 2 or no_seats >= total_seats / 2:
         if yes_seats > no_seats:
             bill_status = "passed"
         else:
@@ -1378,15 +1380,17 @@ def bill_view(bill_id):
         bill_status = "not voted"
 
     return render_template(
-        "bill_view.html",
+        "bill_detail.html",
         bill=bill,
         votes=votes,
         bill_status=bill_status,
         yes_seats=yes_seats,
         no_seats=no_seats,
         abstain_seats=abstain_seats,
-        total_seats=total_seats
+        total_seats=total_seats,
+        expired=expired
     )
+
 
 
 @app.route('/bills')
