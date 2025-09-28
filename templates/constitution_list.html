@@ -17,7 +17,7 @@
     {% for c in constitutions %}
     <tr>
       <td>{{ c.title }}</td>
-      <td>Party {{ c.proposed_by_party_id }}</td>
+      <td>{{ c.proposed_by_party.name if c.proposed_by_party else "Unknown" }}</td>
       <td>
         {% if c.first_vote_passed %}
           ✅ Passed ({{ c.first_vote_date.strftime('%Y-%m-%d') if c.first_vote_date else '' }})
@@ -46,7 +46,7 @@
         {% endif %}
       </td>
       <td>
-        <a href="{{ url_for('constitution_detail', const_id=c.id) }}" class="btn btn-primary btn-sm">View & Vote</a>
+        <a href="{{ url_for('constitution_detail', constitution_id=c.id) }}" class="btn btn-primary btn-sm">View & Vote</a>
       </td>
     </tr>
     {% endfor %}
