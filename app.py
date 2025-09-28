@@ -1468,45 +1468,65 @@ def propose_constitution():
 
     return render_template("constitution_propose.html")
 
-@app.route('/constitution/<int:const_id>', methods=['GET', 'POST'])
+@app.route("/constitution/<int:const_id>", methods=["GET", "POST"])
 @login_required
 def constitution_detail(const_id):
     const = Constitution.query.get_or_404(const_id)
-    party = Party.query.filter_by(founder_id=g.user.id).first()
-    phase = request.form.get("phase")
+    now = datetime.utcnow()
 
-    if phase == "first":
-      if datetime.utcnow() > const.first_vote_deadline:
-        flash("First vote period ended.", "danger")
-        return redirect(url_for('constitution_detail', const_id=const.id))
-    elif phase == "final":
-      if datetime.utcnow() > const.final_vote_deadline:
-        flash("Final vote period ended.", "danger")
-        return redirect(url_for('constitution_detail', const_id=const.id))
+    # Initialize deadlines if not set
+    if not const.first_vote_deadline:
+        const.first_vote_deadline = const.created_at + timedelta(hours=24)
+        db.session.commit()
 
-    if request.method == 'POST':
-        phase = request.form.get("phase")  # "first" or "final"
-        choice = request.form.get("vote")
+    if const.first_vote_passed and not const.final_vote_deadline:
+        const.final_vote_deadline = const.first_vote_deadline + timedelta(hours=24)
+        db.session.commit()
 
-        existing_vote = ConstitutionVote.query.filter_by(
-            constitution_id=const.id, party_id=party.id, phase=phase
-        ).first()
+    expired_first = now > const.first_vote_deadline
+    expired_final = const.final_vote_deadline and now > const.final_vote_deadline
 
-        if existing_vote:
-            flash("Your party already voted!", "warning")
-        else:
-            new_vote = ConstitutionVote(
-                constitution_id=const.id,
-                party_id=party.id,
-                vote_choice=choice,
-                phase=phase
-            )
-            db.session.add(new_vote)
-            db.session.commit()
-            flash("Vote submitted!", "success")
+    # Handle voting
+    if request.method == "POST" and g.user:
+        phase = request.form.get("phase")
+        vote_choice = request.form.get("vote")
 
+        if vote_choice in ["yes", "no", "abstain"]:
+            if phase == "first" and not expired_first and not const.first_vote_passed:
+                new_vote = ConstitutionVote(
+                    constitution_id=const.id,
+                    party_id=g.user.party_id,
+                    phase="first",
+                    vote_choice=vote_choice
+                )
+                db.session.add(new_vote)
+                db.session.commit()
+                flash("Din röst har sparats för första omröstningen!", "success")
+
+            elif phase == "final" and const.first_vote_passed and not expired_final:
+                new_vote = ConstitutionVote(
+                    constitution_id=const.id,
+                    party_id=g.user.party_id,
+                    phase="final",
+                    vote_choice=vote_choice
+                )
+                db.session.add(new_vote)
+                db.session.commit()
+                flash("Din röst har sparats för slutomröstningen!", "success")
+
+        return redirect(url_for("constitution_detail", const_id=const.id))
+
+    # Collect votes
     votes = ConstitutionVote.query.filter_by(constitution_id=const.id).all()
-    return render_template("constitution_detail.html", const=const, votes=votes)
+
+    return render_template(
+        "constitution_detail.html",
+        const=const,
+        votes=votes,
+        expired_first=expired_first,
+        expired_final=expired_final
+    )
+
 
 
 
@@ -2019,6 +2039,20 @@ def admin_force_government(party_id):
 
     flash(f"Admin has forced {party.name} to form government ✅", "success")
     return redirect(url_for('riksdag'))
+
+@app.route("/admin/pass_constitution/<int:const_id>", methods=["POST"])
+@login_required
+def admin_pass_constitution(const_id):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    const = Constitution.query.get_or_404(const_id)
+    const.first_vote_passed = True
+    const.final_vote_deadline = datetime.utcnow() + timedelta(hours=24)
+    db.session.commit()
+
+    flash("Constitution has been force-passed by admin!", "info")
+    return redirect(url_for("constitution_detail", const_id=const.id))
 
 
 if __name__ == '__main__':
