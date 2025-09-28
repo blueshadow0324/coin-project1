@@ -2123,6 +2123,27 @@ def admin_pass_constitution(const_id):
     flash("Constitution has been force-passed by admin!", "info")
     return redirect(url_for("constitution_detail", const_id=const.id))
 
+import subprocess
+import tempfile
+from flask import send_file
+
+@app.route("/download-db")
+@login_required
+def download_db():
+    if g.user.username != ADMIN_USERNAME:
+        flash("You are not authorized to download the database.", "danger")
+        return redirect(url_for("index"))
+
+    # Create a temp file for dump
+    tmpfile = tempfile.NamedTemporaryFile(delete=False, suffix=".sql")
+    tmpfile.close()
+
+    # Run pg_dump (Render sets DATABASE_URL env var)
+    db_url = os.environ.get("DATABASE_URL")
+    subprocess.run(["pg_dump", db_url, "-f", tmpfile.name], check=True)
+
+    return send_file(tmpfile.name, as_attachment=True, download_name="database_dump.sql")
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
