@@ -1858,6 +1858,7 @@ class Constitution(db.Model):
     final_vote_date = db.Column(db.DateTime)
     first_vote_deadline = db.Column(db.DateTime)
     final_vote_deadline = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 from datetime import datetime, timedelta
@@ -1932,6 +1933,11 @@ def migrate_tables():
 
         try:
             conn.execute(text('ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'))
+        except Exception as e:
+            print("constitution.final_vote_deadline exists:", e)
+        try:
+            conn.execute(text('ALTER TABLE constitution ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+            print("✅ Added column created_at to Constitution")
         except Exception as e:
             print("constitution.final_vote_deadline exists:", e)
 
