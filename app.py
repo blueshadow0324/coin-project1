@@ -1468,67 +1468,80 @@ def propose_constitution():
 
     return render_template("constitution_propose.html")
 
-@app.route("/constitution/<int:const_id>", methods=["GET", "POST"])
+@app.route("/constitution/<int:constitution_id>", methods=["GET", "POST"])
 @login_required
-def constitution_detail(const_id):
-    const = Constitution.query.get_or_404(const_id)
-    now = datetime.utcnow()
-
-    # Initialize deadlines if not set
-    if not const.first_vote_deadline:
-        const.first_vote_deadline = const.created_at + timedelta(hours=24)
-        db.session.commit()
-
-    if const.first_vote_passed and not const.final_vote_deadline:
-        const.final_vote_deadline = const.first_vote_deadline + timedelta(hours=24)
-        db.session.commit()
-
-    expired_first = now > const.first_vote_deadline
-    expired_final = const.final_vote_deadline and now > const.final_vote_deadline
+def constitution_detail(constitution_id):
+    constitution = Constitution.query.get_or_404(constitution_id)
+    riksdag_results = calculate_riksdag_seats()
+    total_seats = sum(p["seats"] for p in riksdag_results)
+    majority_needed = total_seats // 2 + 1
 
     # Handle voting
     if request.method == "POST" and g.user:
-        phase = request.form.get("phase")
         vote_choice = request.form.get("vote")
-
         if vote_choice in ["yes", "no", "abstain"]:
-            if phase == "first" and not expired_first and not const.first_vote_passed:
-                new_vote = ConstitutionVote(
-                    constitution_id=const.id,
-                    party_id=g.user.party_id,
-                    phase="first",
-                    vote_choice=vote_choice
-                )
-                db.session.add(new_vote)
-                db.session.commit()
-                flash("Din röst har sparats för första omröstningen!", "success")
+            # Check if already voted
+            existing_vote = ConstitutionVote.query.filter_by(
+                constitution_id=constitution.id,
+                party_id=g.user.party_id
+            ).first()
 
-            elif phase == "final" and const.first_vote_passed and not expired_final:
-                new_vote = ConstitutionVote(
-                    constitution_id=const.id,
-                    party_id=g.user.party_id,
-                    phase="final",
-                    vote_choice=vote_choice
-                )
-                db.session.add(new_vote)
-                db.session.commit()
-                flash("Din röst har sparats för slutomröstningen!", "success")
+            if existing_vote:
+                flash("❌ Your party has already voted and cannot change.", "danger")
+            else:
+                # Check deadline
+                now = datetime.utcnow()
+                if constitution.final_vote_deadline and now > constitution.final_vote_deadline:
+                    flash("❌ Voting is closed for this constitution.", "danger")
+                else:
+                    new_vote = ConstitutionVote(
+                        constitution_id=constitution.id,
+                        party_id=g.user.party_id,
+                        vote_choice=vote_choice
+                    )
+                    db.session.add(new_vote)
+                    db.session.commit()
+                    flash("✅ Your vote has been recorded", "success")
 
-        return redirect(url_for("constitution_detail", const_id=const.id))
+        return redirect(url_for("constitution_detail", constitution_id=constitution.id))
 
     # Collect votes
-    votes = ConstitutionVote.query.filter_by(constitution_id=const.id).all()
+    votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
+    yes_seats = sum(next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
+                    for v in votes if v.vote_choice == "yes")
+    no_seats = sum(next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
+                   for v in votes if v.vote_choice == "no")
+    abstain_seats = sum(next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
+                        for v in votes if v.vote_choice == "abstain")
+
+    # Status calculation
+    now = datetime.utcnow()
+    if constitution.final_vote_deadline and now > constitution.final_vote_deadline:
+        if yes_seats >= majority_needed:
+            status = "passed"
+        elif no_seats >= majority_needed:
+            status = "failed"
+        else:
+            status = "failed"  # deadline passed but no majority
+    else:
+        if yes_seats >= majority_needed:
+            status = "passed"
+        elif no_seats >= majority_needed:
+            status = "failed"
+        else:
+            status = "not voted yet"
 
     return render_template(
         "constitution_detail.html",
-        const=const,
+        constitution=constitution,
         votes=votes,
-        expired_first=expired_first,
-        expired_final=expired_final
+        yes_seats=yes_seats,
+        no_seats=no_seats,
+        abstain_seats=abstain_seats,
+        total_seats=total_seats,
+        majority_needed=majority_needed,
+        status=status
     )
-
-
-
 
 def calculate_riksdag_seats():
     total_votes = db.session.query(func.count(Vote.id)).scalar() or 0
@@ -1942,6 +1955,19 @@ def migrate_constitution():
             print("✅ Added column first_vote_passed to Constitution")
 
     return "✅ Constitution table migrated successfully!"
+
+@app.route("/admin/delete_constitution/<int:constitution_id>", methods=["POST"])
+@login_required
+def admin_delete_constitution(constitution_id):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    constitution = Constitution.query.get_or_404(constitution_id)
+    db.session.delete(constitution)
+    db.session.commit()
+    flash("Constitution deleted ✅", "success")
+    return redirect(url_for("constitutions_list"))
+
 
 
 @app.route("/admin/migrate_tables", methods=['GET'])
