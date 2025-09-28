@@ -1907,10 +1907,47 @@ def vote_constitution_final(const_id, votes_dict):
     db.create_all()
     return "Database initialized ✅"
 
+@app.route("/admin/migrate_constitution")
+@login_required
+def migrate_constitution():
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    inspector = inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("constitution")]
+
+    with db.engine.begin() as conn:
+        if "created_at" not in columns:
+            conn.execute(text(
+                'ALTER TABLE constitution ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+            ))
+            print("✅ Added column created_at to Constitution")
+
+        if "first_vote_deadline" not in columns:
+            conn.execute(text(
+                'ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'
+            ))
+            print("✅ Added column first_vote_deadline to Constitution")
+
+        if "final_vote_deadline" not in columns:
+            conn.execute(text(
+                'ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'
+            ))
+            print("✅ Added column final_vote_deadline to Constitution")
+
+        if "first_vote_passed" not in columns:
+            conn.execute(text(
+                'ALTER TABLE constitution ADD COLUMN first_vote_passed BOOLEAN DEFAULT FALSE'
+            ))
+            print("✅ Added column first_vote_passed to Constitution")
+
+    return "✅ Constitution table migrated successfully!"
+
+
 @app.route("/admin/migrate_tables", methods=['GET'])
 @login_required
 def migrate_tables():
-    if not g.user or g.user.username != "ADMIN_USERNAME":
+    if not g.user or g.user.username != "YOUR_ADMIN_USERNAME":
         return "Forbidden", 403
 
     with db.engine.connect() as conn:
