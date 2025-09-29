@@ -2123,7 +2123,25 @@ def admin_force_government(party_id):
     flash(f"Admin has forced {party.name} to form government ✅", "success")
     return redirect(url_for('riksdag'))
 
-@app.route("/admin/pass_constitution/<int:const_id>", methods=["POST"])
+@app.route('/admin/delete_constitution/<int:constitution_id>', methods=['POST'])
+@login_required
+def admin_delete_constitution(constitution_id):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    constitution = Constitution.query.get_or_404(constitution_id)
+
+    # If you have a ConstitutionVote model, uncomment the next line:
+    # ConstitutionVote.query.filter_by(constitution_id=constitution.id).delete()
+
+    db.session.delete(constitution)
+    db.session.commit()
+
+    flash(f"Constitution '{constitution.title}' has been deleted.", "info")
+    return redirect(url_for('constitutions_list'))
+
+
+@app.route("/admin/pass_constitution/<int:constitution_id>", methods=["POST"])
 @login_required
 def admin_pass_constitution(const_id):
     if g.user.username != ADMIN_USERNAME:
