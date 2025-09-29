@@ -46,17 +46,25 @@
         {% endif %}
       </td>
       <td>
+        <!-- View & Vote button -->
         <a href="{{ url_for('constitution_detail', constitution_id=c.id) }}" class="btn btn-primary btn-sm">View & Vote</a>
-      </td>
-      <td>
-       {% if g.user.username == ADMIN_USERNAME %}
-         <form method="POST" action="{{ url_for('admin_delete_const', const_id=c.id) }}" style="display:inline;">
-         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this constitution?');">Delete</button>
-         </form>
-         <form method="POST" action="{{ url_for('admin_pass_const', const_id=c.id) }}" style="display:inline;">
-         <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Force pass this constitution?');">Force Pass</button>
-         </form>
-      {% endif %}
+
+        {% if g.user.username == ADMIN_USERNAME %}
+        <!-- Admin buttons -->
+        <form method="POST" action="{{ url_for('admin_delete_const', constitution_id=c.id) }}" style="display:inline;">
+          <button type="submit" class="btn btn-danger btn-sm"
+                  onclick="return confirm('Are you sure you want to delete this constitution?');">
+            Delete
+          </button>
+        </form>
+
+        <form method="POST" action="{{ url_for('admin_pass_const', constitution_id=c.id) }}" style="display:inline;">
+          <button type="submit" class="btn btn-success btn-sm"
+                  onclick="return confirm('Force pass this constitution?');">
+            Force Pass
+          </button>
+        </form>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
