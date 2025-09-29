@@ -1517,45 +1517,8 @@ def constitution_detail(constitution_id):
                     db.session.commit()
                     flash("✅ Your vote has been recorded", "success")
 
-        return redirect(url_for("constitution_detail", constitution_id=constitution.id))
+        return redirect(url_for("constitution_detail", constitution_id=constitution_id))
 
-    # Collect votes
-    votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
-    yes_seats = sum(next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
-                    for v in votes if v.vote_choice == "yes")
-    no_seats = sum(next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
-                   for v in votes if v.vote_choice == "no")
-    abstain_seats = sum(next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
-                        for v in votes if v.vote_choice == "abstain")
-
-    # Status calculation
-    now = datetime.utcnow()
-    if constitution.final_vote_deadline and now > constitution.final_vote_deadline:
-        if yes_seats >= majority_needed:
-            status = "passed"
-        elif no_seats >= majority_needed:
-            status = "failed"
-        else:
-            status = "failed"  # deadline passed but no majority
-    else:
-        if yes_seats >= majority_needed:
-            status = "passed"
-        elif no_seats >= majority_needed:
-            status = "failed"
-        else:
-            status = "not voted yet"
-
-    return render_template(
-        "constitution_detail.html",
-        constitution=constitution,
-        votes=votes,
-        yes_seats=yes_seats,
-        no_seats=no_seats,
-        abstain_seats=abstain_seats,
-        total_seats=total_seats,
-        majority_needed=majority_needed,
-        status=status
-    )
 
 def calculate_riksdag_seats():
     total_votes = db.session.query(func.count(Vote.id)).scalar() or 0
