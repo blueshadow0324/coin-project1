@@ -1491,61 +1491,23 @@ def constitution_detail(constitution_id):
     total_seats = sum(p["seats"] for p in riksdag_results)
     majority_needed = total_seats // 2 + 1
 
+    # Compute vote counts
+    votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
+    yes_seats = sum(p["seats"] for p in riksdag_results if any(v.party_id == p["id"] and v.vote_choice == "yes" for v in votes))
+    no_seats = sum(p["seats"] for p in riksdag_results if any(v.party_id == p["id"] and v.vote_choice == "no" for v in votes))
+    abstain_seats = sum(p["seats"] for p in riksdag_results if any(v.party_id == p["id"] and v.vote_choice == "abstain" for v in votes))
+
     now = datetime.utcnow()
 
-    # Determine status
     if constitution.final_vote_passed:
         status = "passed"
-    elif constitution.final_vote_deadline and now > constitution.final_vote_deadline:
-        status = "closed"
+    elif constitution.first_vote_passed:
+        # first vote passed but final vote not done yet
+        status = "in_final_vote"
     else:
-        status = "not voted yet"
+        # first vote not yet passed, so voting is open
+        status = "not_voted_yet"
 
-    # Handle POST vote
-    if request.method == "POST" and g.user and status != "closed":
-        vote_choice = request.form.get("vote")
-        if vote_choice in ["yes", "no", "abstain"]:
-            existing_vote = ConstitutionVote.query.filter_by(
-                constitution_id=constitution.id,
-                party_id=g.user.party_id
-            ).first()
-
-            if existing_vote:
-                flash("❌ Your party has already voted and cannot change.", "danger")
-            else:
-                new_vote = ConstitutionVote(
-                    constitution_id=constitution.id,
-                    party_id=g.user.party_id,
-                    vote_choice=vote_choice
-                )
-                db.session.add(new_vote)
-                db.session.commit()
-                flash("✅ Your vote has been recorded", "success")
-        return redirect(url_for("constitution_detail", constitution_id=constitution_id))
-
-    # Compute votes
-    votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
-    yes_seats = sum(
-        next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
-        for v in votes if v.vote_choice == "yes"
-    )
-    no_seats = sum(
-        next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
-        for v in votes if v.vote_choice == "no"
-    )
-    abstain_seats = sum(
-        next((p["seats"] for p in riksdag_results if p["id"] == v.party_id), 0)
-        for v in votes if v.vote_choice == "abstain"
-    )
-
-    # If enough yes votes, mark first/final votes as passed automatically
-    if not constitution.first_vote_passed and yes_seats > total_seats / 2:
-        constitution.first_vote_passed = True
-        constitution.final_vote_deadline = now + timedelta(hours=24)
-        db.session.commit()
-        status = "voting ongoing"
-
-    # Pass everything to template
     return render_template(
         "constitution_detail.html",
         constitution=constitution,
@@ -1555,10 +1517,9 @@ def constitution_detail(constitution_id):
         yes_seats=yes_seats,
         no_seats=no_seats,
         abstain_seats=abstain_seats,
-        status=status,
-        now=now,
-        ADMIN_USERNAME=ADMIN_USERNAME
+        status=status
     )
+
 
 
 

@@ -9,6 +9,8 @@
     <span class="badge bg-success">Passed</span>
   {% elif status == "failed" %}
     <span class="badge bg-danger">Failed</span>
+  {% elif status == "closed" %}
+    <span class="badge bg-secondary">Voting Closed</span>
   {% else %}
     <span class="badge bg-warning">Not voted yet</span>
   {% endif %}
@@ -36,7 +38,7 @@
     <button type="submit" name="vote" value="no" class="btn btn-danger">No</button>
     <button type="submit" name="vote" value="abstain" class="btn btn-secondary">Abstain</button>
   </form>
-{% else %}
+{% elif status == "closed" %}
   <p>⚠️ Voting is closed for this constitution.</p>
 {% endif %}
 
@@ -44,5 +46,11 @@
   <form method="POST" action="{{ url_for('admin_delete_constitution', constitution_id=constitution.id) }}">
     <button type="submit" class="btn btn-danger mt-3">Delete Constitution</button>
   </form>
+
+  {% if not constitution.first_vote_passed %}
+    <form method="POST" action="{{ url_for('admin_pass_const', constitution_id=constitution.id) }}">
+      <button type="submit" class="btn btn-success mt-2">Force Pass Constitution</button>
+    </form>
+  {% endif %}
 {% endif %}
 {% endblock %}
