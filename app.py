@@ -1494,7 +1494,6 @@ def constitution_detail(constitution_id):
     if request.method == "POST" and g.user:
         vote_choice = request.form.get("vote")
         if vote_choice in ["yes", "no", "abstain"]:
-            # Check if already voted
             existing_vote = ConstitutionVote.query.filter_by(
                 constitution_id=constitution.id,
                 party_id=g.user.party_id
@@ -1503,7 +1502,6 @@ def constitution_detail(constitution_id):
             if existing_vote:
                 flash("❌ Your party has already voted and cannot change.", "danger")
             else:
-                # Check deadline
                 now = datetime.utcnow()
                 if constitution.final_vote_deadline and now > constitution.final_vote_deadline:
                     flash("❌ Voting is closed for this constitution.", "danger")
@@ -1518,6 +1516,17 @@ def constitution_detail(constitution_id):
                     flash("✅ Your vote has been recorded", "success")
 
         return redirect(url_for("constitution_detail", constitution_id=constitution_id))
+
+    # If GET request, render the template
+    votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
+    return render_template(
+        "constitution_detail.html",
+        constitution=constitution,
+        votes=votes,
+        total_seats=total_seats,
+        majority_needed=majority_needed
+    )
+
 
 
 def calculate_riksdag_seats():
@@ -1596,7 +1605,7 @@ def create_party():
 def vote():
     today = date.today()
     # Thursday = 3, Friday = 4
-    if today.weekday() not in [2, 3]:
+    if today.weekday() not in [0, 3]:
         flash("Röstning bara öppen Onsdag och Torsdag!", "danger")
         return redirect(url_for("dashboard"))
 
