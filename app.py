@@ -2133,7 +2133,7 @@ def admin_delete_const(constitution_id):
     db.session.delete(constitution)
     db.session.commit()
     flash(f"Constitution '{constitution.title}' has been deleted.", "info")
-    return redirect(url_for('constitutions_list'))
+    return redirect(url_for('constitution_list'))
 
 
 @app.route("/admin/pass_constitution/<int:constitution_id>", methods=["POST"])
