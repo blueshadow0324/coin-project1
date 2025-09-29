@@ -1456,7 +1456,7 @@ def bills_list():
 @login_required
 def constitution_list():
     constitutions = Constitution.query.all()
-    return render_template("constitution_list.html", constitutions=constitutions)
+    return render_template("constitution_list.html", constitutions=constitutions, ADMIN_USERNAME=ADMIN_USERNAME)
 
 @app.route('/constitution/propose', methods=['GET', 'POST'])
 @login_required
