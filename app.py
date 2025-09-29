@@ -1473,7 +1473,8 @@ def propose_constitution():
             title=title,
             content=content,
             proposed_by_party_id=party.id,
-            first_vote_date=datetime.utcnow()
+            first_vote_date=datetime.utcnow(),
+            final_vote_deadline=datetime.utcnow()
         )
         db.session.add(new_const)
         db.session.commit()
