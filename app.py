@@ -1520,7 +1520,7 @@ def constitution_detail(constitution_id):
     # If GET request, render the template
     votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
     return render_template(
-        "constitution_detail.html",
+        "constitution_list.html",
         constitution=constitution,
         votes=votes,
         total_seats=total_seats,
