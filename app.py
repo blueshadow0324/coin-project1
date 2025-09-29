@@ -1478,7 +1478,7 @@ def propose_constitution():
         db.session.add(new_const)
         db.session.commit()
         flash("Amendment proposed!", "success")
-        return redirect(url_for('constitution_detail', const_id=new_const.id))
+        return redirect(url_for('constitution_list', const_id=new_const.id))
 
     return render_template("constitution_propose.html")
 
@@ -1520,7 +1520,7 @@ def constitution_detail(constitution_id):
     # If GET request, render the template
     votes = ConstitutionVote.query.filter_by(constitution_id=constitution.id).all()
     return render_template(
-        "constitution_list.html",
+        "constitution_detail.html",
         constitution=constitution,
         votes=votes,
         total_seats=total_seats,
