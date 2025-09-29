@@ -2138,17 +2138,17 @@ def admin_delete_const(constitution_id):
 
 @app.route("/admin/pass_constitution/<int:constitution_id>", methods=["POST"])
 @login_required
-def admin_pass_const(const_id):
+def admin_pass_const(constitution_id):
     if g.user.username != ADMIN_USERNAME:
         abort(403)
 
-    const = Constitution.query.get_or_404(const_id)
+    const = Constitution.query.get_or_404(constitution_id)
     const.first_vote_passed = True
     const.final_vote_deadline = datetime.utcnow() + timedelta(hours=24)
     db.session.commit()
 
     flash("Constitution has been force-passed by admin!", "info")
-    return redirect(url_for("constitution_detail", const_id=const.id))
+    return redirect(url_for("constitution_detail", constitution_id=const.id))
 
 import subprocess
 import tempfile
