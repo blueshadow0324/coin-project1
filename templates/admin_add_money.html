@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Money to {{ user.username }}</h2>
+
+<form method="POST">
+  <label for="amount">Amount:</label>
+  <input type="number" name="amount" id="amount" min="1" required>
+  <button type="submit" class="btn btn-success">Add Money</button>
+</form>
+{% endblock %}

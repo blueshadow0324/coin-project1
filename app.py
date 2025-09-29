@@ -1380,7 +1380,7 @@ def bill_view(bill_id):
         bill_status = "not voted"
 
     return render_template(
-        "bill_detail.html",
+        "bill_view.html",
         bill=bill,
         votes=votes,
         bill_status=bill_status,
@@ -2136,6 +2136,34 @@ def admin_download_db():
 
     db_path = os.path.join(os.getcwd(), "app.db")  # adjust if using SQLite
     return send_file(db_path, as_attachment=True, download_name="database.sqlite")
+
+@app.route("/admin/add/<username>", methods=["POST", "GET"])
+@login_required
+def admin_add_money(username):
+    if g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    user = User.query.filter_by(username=username).first_or_404()
+
+    if request.method == "POST":
+        try:
+            amount = int(request.form.get("amount", 0))
+        except ValueError:
+            flash("Invalid amount.", "danger")
+            return redirect(url_for("admin_add_money", username=username))
+
+        if amount <= 0:
+            flash("Amount must be greater than 0.", "danger")
+            return redirect(url_for("admin_add_money", username=username))
+
+        # Add money to user
+        user.coins = (user.coins or 0) + amount
+        db.session.commit()
+
+        flash(f"✅ Added {amount} coins to {user.username}.", "success")
+        return redirect(url_for("dashboard"))
+
+    return render_template("admin_add_money.html", user=user)
 
 
 if __name__ == '__main__':
