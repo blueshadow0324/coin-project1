@@ -1336,11 +1336,13 @@ def propose_bill():
 @login_required
 def bill_view(bill_id):
     bill = Bill.query.get_or_404(bill_id)
-
     now = datetime.utcnow()
     expired = now > bill.vote_deadline if bill.vote_deadline else False
 
-    # Handle POST vote only if not expired
+    riksdag_results = calculate_riksdag_seats()
+    total_seats = sum(p["seats"] for p in riksdag_results)
+
+    # Handle POST vote only if bill is not expired
     if request.method == "POST" and g.user and not expired:
         vote_choice = request.form.get("vote")
         if vote_choice in ["yes", "no", "abstain"]:
@@ -1363,12 +1365,13 @@ def bill_view(bill_id):
 
     # --- Compute votes ---
     votes = BillVote.query.filter_by(bill_id=bill.id).all()
-    yes_seats = sum(v.party.seats for v in votes if v.vote_choice == "yes")
-    no_seats = sum(v.party.seats for v in votes if v.vote_choice == "no")
-    abstain_seats = sum(v.party.seats for v in votes if v.vote_choice == "abstain")
 
-    riksdag_results = calculate_riksdag_seats()
-    total_seats = sum(p["seats"] for p in riksdag_results)
+    def get_party_seats(party_id):
+        return next((p["seats"] for p in riksdag_results if p["id"] == party_id), 0)
+
+    yes_seats = sum(get_party_seats(v.party_id) for v in votes if v.vote_choice == "yes")
+    no_seats = sum(get_party_seats(v.party_id) for v in votes if v.vote_choice == "no")
+    abstain_seats = sum(get_party_seats(v.party_id) for v in votes if v.vote_choice == "abstain")
 
     # Determine bill status
     if expired or yes_seats > total_seats / 2 or no_seats >= total_seats / 2:
@@ -1379,17 +1382,28 @@ def bill_view(bill_id):
     else:
         bill_status = "not voted"
 
+    # Prepare votes for display in template
+    vote_display = [
+        {
+            "party_name": next((p["party"] for p in riksdag_results if p["id"] == v.party_id), f"Party {v.party_id}"),
+            "vote_choice": v.vote_choice
+        }
+        for v in votes
+    ]
+
     return render_template(
         "bill_view.html",
         bill=bill,
-        votes=votes,
+        votes=vote_display,
         bill_status=bill_status,
         yes_seats=yes_seats,
         no_seats=no_seats,
         abstain_seats=abstain_seats,
         total_seats=total_seats,
-        expired=expired
+        expired=expired,
+        now=now
     )
+
 
 
 

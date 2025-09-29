@@ -17,9 +17,12 @@
 <hr>
 
 <h4>Live Röst Tabell</h4>
+{% set yes_pct = (yes_seats / total_seats * 100) if total_seats else 0 %}
+{% set no_pct = (no_seats / total_seats * 100) if total_seats else 0 %}
+{% set abstain_pct = (abstain_seats / total_seats * 100) if total_seats else 0 %}
 <div class="progress" style="height: 30px;">
   <div class="progress-bar bg-success" role="progressbar"
-       style="width: {{ (yes_seats / total_seats) * 100 }}
+       style="width: {{ (yes_seats / total_seats) * 100 }}%"
        aria-valuenow="{{ yes_seats }}" aria-valuemin="0" aria-valuemax="{{ total_seats }}">
   </div>
   <div class="progress-bar bg-danger" role="progressbar"
@@ -71,7 +74,7 @@
 <h5>Parti Röster</h5>
 <ul>
   {% for v in votes %}
-    <li>Party {{ v.party_name }} voted {{ v.vote_choice|capitalize }}</li>
+    <li>{{ v.party_name }} voted {{ v.vote_choice|capitalize }}</li>
   {% endfor %}
 </ul>
 
