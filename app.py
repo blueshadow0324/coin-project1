@@ -2127,22 +2127,15 @@ import subprocess
 import tempfile
 from flask import send_file
 
-@app.route("/download-db")
+@app.route("/admin/download-db")
 @login_required
-def download_db():
+def admin_download_db():
     if g.user.username != ADMIN_USERNAME:
         flash("You are not authorized to download the database.", "danger")
         return redirect(url_for("index"))
 
-    # Create a temp file for dump
-    tmpfile = tempfile.NamedTemporaryFile(delete=False, suffix=".sql")
-    tmpfile.close()
-
-    # Run pg_dump (Render sets DATABASE_URL env var)
-    db_url = os.environ.get("DATABASE_URL")
-    subprocess.run(["pg_dump", db_url, "-f", tmpfile.name], check=True)
-
-    return send_file(tmpfile.name, as_attachment=True, download_name="database_dump.sql")
+    db_path = os.path.join(os.getcwd(), "app.db")  # adjust if using SQLite
+    return send_file(db_path, as_attachment=True, download_name="database.sqlite")
 
 
 if __name__ == '__main__':
