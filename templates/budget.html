@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>State Budget</h2>
+<p><strong>Available Funds:</strong> {{ budget.total_amount }} VGC</p>
+
+{% if g.user.username in ["YOUR_ADMIN_USERNAME", "ombudsman"] %}
+<form method="POST" class="mb-4">
+  <div class="mb-3">
+    <label>Category</label>
+    <select name="category" class="form-select">
+      <option value="salary">Salaries</option>
+      <option value="welfare">Välstånd / Welfare</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+
+  <!-- Show username input only if salary is selected -->
+  <div class="mb-3" id="salary-user">
+    <label>Username (for Salary)</label>
+    <input type="text" name="username" class="form-control" placeholder="Enter username">
+  </div>
+
+  <div class="mb-3">
+    <label>Amount (VGC)</label>
+    <input type="number" name="amount" class="form-control" min="1" required>
+  </div>
+  <div class="mb-3">
+    <label>Description</label>
+    <textarea name="description" class="form-control" rows="2"></textarea>
+  </div>
+  <button type="submit" class="btn btn-success">Spend</button>
+</form>
+
+<a href="{{ url_for('admin_salaries') }}" class="btn btn-outline-warning mt-3">
+    Salary Infomation
+</a>
+{% endif %}
+
+<hr>
+
+<h4>📑 Transactions</h4>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Category</th>
+      <th>Amount</th>
+      <th>Description</th>
+      <th>By</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in transactions %}
+    <tr>
+      <td>{{ t.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td>{{ t.category }}</td>
+      <td>{{ t.amount }} VGC</td>
+      <td>{{ t.description }}</td>
+      <td>{{ t.created_by.username if t.created_by else "System" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  // Hide username field if category != salary
+  const categorySelect = document.querySelector('select[name="category"]');
+  const salaryUser = document.getElementById('salary-user');
+
+  function toggleSalaryUser() {
+    if (categorySelect.value === 'salary') {
+      salaryUser.style.display = 'block';
+    } else {
+      salaryUser.style.display = 'none';
+    }
+  }
+
+  categorySelect.addEventListener('change', toggleSalaryUser);
+  toggleSalaryUser();
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Salaries Dashboard</h2>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>Amount per Day</th>
+      <th>Active</th>
+      <th>Last Paid</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in salaries %}
+    <tr>
+      <td>{{ s.receiver.username }}</td>
+      <td>{{ s.amount_per_day }} VGC</td>
+      <td>
+        {% if s.active %}
+          <span class="badge bg-success">Active</span>
+        {% else %}
+          <span class="badge bg-secondary">Inactive</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if s.last_sent %}
+          {{ s.last_sent.strftime("%Y-%m-%d %H:%M") }}
+        {% else %}
+          Never
+        {% endif %}
+      </td>
+      <td>
+        {% if s.active %}
+          <a href="{{ url_for('admin_salaries', cancel_id=s.id) }}"
+             class="btn btn-danger btn-sm"
+             onclick="return confirm('Cancel this salary?');">Cancel</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Assign Daily Salary from State Budget</h2>
+
+<p><strong>Available Funds:</strong> {{ budget.total_funds }} VGC</p>
+
+<form method="POST" class="mb-3">
+  <div class="mb-3">
+    <label for="username" class="form-label">Username</label>
+    <input type="text" name="username" id="username" class="form-control" placeholder="Enter username" required>
+  </div>
+
+  <div class="mb-3">
+    <label for="amount" class="form-label">Amount per Day (VGC)</label>
+    <input type="number" name="amount" id="amount" class="form-control" placeholder="Enter amount" min="1" required>
+  </div>
+
+  <button type="submit" class="btn btn-success">Assign Salary</button>
+</form>
+
+<h4>Existing Users</h4>
+<ul>
+  {% for user in users %}
+    <li>{{ user.username }} (Current Coins: {{ user.coins }})</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -36,6 +36,34 @@ db = SQLAlchemy(app)
 # -----------------------
 #
 
+class Salary(db.Model):
+    __tablename__ = "salary"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    amount_per_day = db.Column(db.Integer, nullable=False)
+    active = db.Column(db.Boolean, default=True)
+    last_sent = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    receiver = db.relationship("User", backref="salaries")
+
+
+class StateBudget(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    total_amount = db.Column(db.Integer, default=1000)   # current available funds
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class BudgetTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(100), nullable=False)  # e.g. "salary", "welfare"
+    amount = db.Column(db.Float, nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Link who created it (a minister, admin, etc.)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+    created_by = db.relationship("User")
+
 class SnakeScore(db.Model):
     __tablename__ = "snake_scores"
     id = db.Column(db.Integer, primary_key=True)
@@ -267,6 +295,7 @@ def logout():
 @app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
+    pay_daily_salaries()
     if request.method == 'POST':
         receiver_username = request.form['receiver'].strip()
         amount_str = request.form['amount'].strip()
@@ -1911,41 +1940,78 @@ def vote_constitution_final(const_id, votes_dict):
     db.create_all()
     return "Database initialized ✅"
 
-@app.route("/admin/migrate_constitution")
+from sqlalchemy import inspect, text
+
+@app.route("/admin/migrate_tables", methods=['GET', 'POST'])
 @login_required
-def migrate_constitution():
+def migrate_tablese():
     if g.user.username != ADMIN_USERNAME:
         abort(403)
 
     inspector = inspect(db.engine)
-    columns = [col["name"] for col in inspector.get_columns("constitution")]
 
+    # --- Constitution table ---
+    const_columns = [col["name"] for col in inspector.get_columns("constitution")]
     with db.engine.begin() as conn:
-        if "created_at" not in columns:
+        if "created_at" not in const_columns:
             conn.execute(text(
                 'ALTER TABLE constitution ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
             ))
             print("✅ Added column created_at to Constitution")
 
-        if "first_vote_deadline" not in columns:
+        if "first_vote_deadline" not in const_columns:
             conn.execute(text(
                 'ALTER TABLE constitution ADD COLUMN first_vote_deadline TIMESTAMP'
             ))
             print("✅ Added column first_vote_deadline to Constitution")
 
-        if "final_vote_deadline" not in columns:
+        if "final_vote_deadline" not in const_columns:
             conn.execute(text(
                 'ALTER TABLE constitution ADD COLUMN final_vote_deadline TIMESTAMP'
             ))
             print("✅ Added column final_vote_deadline to Constitution")
 
-        if "first_vote_passed" not in columns:
+        if "first_vote_passed" not in const_columns:
             conn.execute(text(
                 'ALTER TABLE constitution ADD COLUMN first_vote_passed BOOLEAN DEFAULT FALSE'
             ))
             print("✅ Added column first_vote_passed to Constitution")
 
-    return "✅ Constitution table migrated successfully!"
+    # --- StateBudget table ---
+    budget_columns = [col["name"] for col in inspector.get_columns("state_budget")]
+    with db.engine.begin() as conn:
+        if "total_funds" not in budget_columns:
+            conn.execute(text(
+                'ALTER TABLE state_budget ADD COLUMN total_funds INTEGER DEFAULT 0'
+            ))
+            print("✅ Added column total_funds to StateBudget")
+
+        if "updated_at" not in budget_columns:
+            conn.execute(text(
+                'ALTER TABLE state_budget ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+            ))
+            print("✅ Added column updated_at to StateBudget")
+
+    return "✅ Migration complete for Constitution and StateBudget tables!"
+
+@app.route("/admin/migrate_state_budget")
+@login_required
+def migrate_state_budget():
+    if not g.user or g.user.username != ADMIN_USERNAME:
+        abort(403)
+
+    inspector = inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("state_budget")]
+
+    with db.engine.begin() as conn:
+        if "total_amount" not in columns:
+            # Add column total_amount with default 0
+            conn.execute(text(
+                "ALTER TABLE state_budget ADD COLUMN total_amount INTEGER DEFAULT 100"
+            ))
+            print("✅ Added column total_amount to StateBudget")
+
+    return "✅ StateBudget table migrated successfully!"
 
 @app.route("/admin/delete_constitution/<int:constitution_id>", methods=["POST"])
 @login_required
@@ -2014,6 +2080,35 @@ def migrate_tables():
                     """))
         except Exception as e:
             print("report table exists or error:", e)
+        try:
+            conn.execute(text("""
+                        CREATE TABLE state_budget (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            total_amount FLOAT DEFAULT 0.0,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """))
+            conn.execute(text("INSERT INTO state_budget (total_amount) VALUES (1000000)"))  # seed 1M kr
+            print("✅ state_budget table created")
+        except Exception as e:
+            print("ℹ️ state_budget already exists:", e)
+
+            # --- BudgetTransaction table ---
+        try:
+            conn.execute(text("""
+                        CREATE TABLE budget_transaction (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            category VARCHAR(100) NOT NULL,
+                            amount FLOAT NOT NULL,
+                            description TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            created_by_id INTEGER,
+                            FOREIGN KEY(created_by_id) REFERENCES user(id)
+                        )
+                    """))
+            print("✅ budget_transaction table created")
+        except Exception as e:
+            print("ℹ️ budget_transaction already exists:", e)
 
     return "✅ Migration complete for Bill and Constitution tables"
 
@@ -2220,6 +2315,187 @@ def admin_reports():
 
     reports = Report.query.order_by(Report.created_at.desc()).all()
     return render_template("admin_reports.html", reports=reports)
+
+@app.route("/budget", methods=["GET", "POST"])
+@login_required
+def budget_dashboard():
+    budget = StateBudget.query.first()
+    if not budget:
+        budget = StateBudget(total_amount=10000)  # default: 10000 kr
+        db.session.add(budget)
+        db.session.commit()
+
+    if request.method == "POST":
+        if g.user.username != "YOUR_ADMIN_USERNAME":  # only regering can spend
+            flash("❌ Only the Regering can manage the budget!", "danger")
+            return redirect(url_for("budget_dashboard"))
+
+        category = request.form["category"]
+        amount = float(request.form["amount"])
+        description = request.form["description"]
+
+        if budget.total_amount - int(amount) < 0:
+            flash("❌ Not enough funds!", "danger")
+        else:
+            budget.total_amount -= amount
+            tx = BudgetTransaction(
+                category=category,
+                amount=-amount,
+                description=description,
+                created_by_id=g.user.id,
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f"✅ Spent {amount} kr on {category}", "success")
+
+    transactions = BudgetTransaction.query.order_by(BudgetTransaction.created_at.desc()).all()
+    return render_template("budget.html", budget=budget, transactions=transactions, total=budget.total_amount)
+
+@app.route("/admin/budget", methods=["GET", "POST"])
+@login_required
+def admin_budget():
+    if not g.user or g.user.username not in ["YOUR_ADMIN_USERNAME", "ombudsman"]:
+        abort(403)
+
+    pay_daily_salaries()
+    # Fetch state budget
+    budget = StateBudget.query.first()
+    if not budget:
+        # Create budget row if not exists
+        budget = StateBudget(total_funds=0)
+        db.session.add(budget)
+        db.session.commit()
+
+    # Handle spending
+    if request.method == "POST":
+        category = request.form.get("category")
+        amount_str = request.form.get("amount", "0").strip()
+        description = request.form.get("description", "").strip()
+
+        if not amount_str.isdigit() or int(amount_str) <= 0:
+            flash("Ange ett giltigt belopp.", "danger")
+            return redirect(url_for("admin_budget"))
+
+        amount = int(amount_str)
+        if amount > budget.total_funds:
+            flash("Otillräckliga statliga medel.", "danger")
+            return redirect(url_for("admin_budget"))
+
+        # Deduct from budget
+        budget.total_funds -= amount
+
+        # Special handling for salaries
+        if category == "salary":
+            username = request.form.get("username", "").strip()
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                flash("Användaren finns inte.", "danger")
+                return redirect(url_for("admin_budget"))
+
+            salary = Salary(
+                user_id=user.id,
+                amount_per_day=amount,
+                active=True,
+                created_at=datetime.utcnow()
+            )
+            db.session.add(salary)
+            flash(f"{amount} VGC per dag tilldelad {username}.", "success")
+        else:
+            # Create a transaction record for other categories
+            transaction = Transaction(
+                amount=amount,
+                category=category,
+                description=description,
+                created_by_id=g.user.id
+            )
+            db.session.add(transaction)
+            flash(f"{amount} VGC spenderat på {category}.", "success")
+
+        db.session.commit()
+        return redirect(url_for("admin_budget"))
+
+    # Show all transactions
+    transactions = Transaction.query.order_by(Transaction.created_at.desc()).all()
+    total = StateBudget.total_amount  # <- define total here
+    return render_template("budget.html", budget=budget, transactions=transactions)
+
+@app.route("/admin/salaries", methods=["GET", "POST"])
+@login_required
+def admin_salaries():
+    if not g.user or g.user.username not in ["YOUR_ADMIN_USERNAME", "ombudsman"]:
+        abort(403)
+    pay_daily_salaries()
+
+    # Handle cancel salary
+    if request.method == "POST":
+        salary_id = request.form.get("salary_id")
+        salary = Salary.query.get(salary_id)
+        if salary:
+            salary.active = False
+            db.session.commit()
+            flash(f"Salary for {salary.receiver.username} has been canceled.", "success")
+        return redirect(url_for("admin_salaries"))
+
+    # Fetch all active salaries
+    salaries = Salary.query.order_by(Salary.created_at.desc()).all()
+    return render_template("admin_salaries.html", salaries=salaries)
+
+def pay_daily_salaries():
+    today = datetime.utcnow().date()
+    salaries = Salary.query.filter_by(active=True).all()
+
+    for s in salaries:
+        # Only pay if never paid today
+        if not s.last_sent or s.last_sent.date() < today:
+            # Ensure the user exists
+            if not s.receiver:
+                continue
+
+            # Pay the user
+            s.receiver.coins += s.amount_per_day
+            s.last_sent = datetime.utcnow()
+
+            # Optional: create a transaction for logging
+            transaction = Transaction(
+                sender_id=None,  # Paid by state
+                receiver_id=s.receiver.id,
+                amount=s.amount_per_day,
+                category="salary",
+                description="Daily salary payout"
+            )
+            db.session.add(transaction)
+
+    db.session.commit()
+
+
+from sqlalchemy import inspect, text
+from flask import abort
+from datetime import datetime
+
+from sqlalchemy import inspect, text
+
+@app.route("/admin/migrate_salary")
+@login_required
+def migrate_salary():
+    if g.user.username != "YOUR_ADMIN_USERNAME":
+        abort(403)
+
+    inspector = inspect(db.engine)
+    if "salary" not in inspector.get_table_names():
+        with db.engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE salary (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    amount_per_day INTEGER NOT NULL,
+                    active BOOLEAN DEFAULT 1,
+                    last_sent DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES user(id)
+                )
+            """))
+        return "✅ Salary table created!"
+    return "Salary table already exists."
 
 
 if __name__ == '__main__':

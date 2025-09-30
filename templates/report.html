@@ -19,9 +19,9 @@
   <button type="submit" class="btn btn-primary">Skicka in Mål</button>
 </form>
 
-{% if g.user and (g.user.username == "YOUR_ADMIN_USERNAME" or g.user.username == "ombudsman") %}
+{% if g.user and (g.user.username == "YOUR_ADMIN_USERNAME" or g.user.username == "ELLIOT") %}
   <a href="{{ url_for('admin_reports') }}" class="btn btn-outline-warning mt-3">
-    📑 Admin Reports
+    Admin Reports
   </a>
 {% endif %}
 {% endblock %}
