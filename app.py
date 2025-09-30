@@ -62,6 +62,16 @@ class DinoReward(db.Model):
     date = db.Column(db.Date, unique=True, nullable=False)
     distributed = db.Column(db.Boolean, default=False)
 
+class Report(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(50), nullable=False)  # "crime", "tvistemal", "statmal"
+    description = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user = db.relationship("User", backref="reports")
+
+
 class User(db.Model):
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
@@ -1958,6 +1968,7 @@ def migrate_tables():
         return "Forbidden", 403
 
     with db.engine.connect() as conn:
+
         # Bill table
         try:
             conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
@@ -1984,6 +1995,25 @@ def migrate_tables():
             print("✅ Added column created_at to Constitution")
         except Exception as e:
             print("constitution.final_vote_deadline exists:", e)
+        try:
+            conn.execute(text('ALTER TABLE bill ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+        except Exception as e:
+            print("bill.created_at exists or error:", e)
+
+            # Create Report table if not exists
+        try:
+            conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS report (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            category VARCHAR(50) NOT NULL,
+                            description TEXT NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            created_by_id INTEGER,
+                            FOREIGN KEY(created_by_id) REFERENCES user (id)
+                        )
+                    """))
+        except Exception as e:
+            print("report table exists or error:", e)
 
     return "✅ Migration complete for Bill and Constitution tables"
 
@@ -2158,6 +2188,38 @@ def admin_add_money(username):
         return redirect(url_for("dashboard"))
 
     return render_template("admin_add_money.html", user=user)
+
+@app.route("/report", methods=["GET", "POST"])
+@login_required
+def report():
+    if request.method == "POST":
+        category = request.form.get("category")
+        description = request.form.get("description")
+
+        if not category or not description:
+            flash("❌ All fields are required.", "danger")
+        else:
+            new_report = Report(
+                category=category,
+                description=description,
+                user_id=g.user.id
+            )
+            db.session.add(new_report)
+            db.session.commit()
+            flash("✅ Your report has been submitted.", "success")
+            return redirect(url_for("report"))
+
+    return render_template("report.html")
+
+@app.route("/admin/reports")
+@login_required
+def admin_reports():
+    # Only allow specific users
+    if g.user.username not in ["YOUR_ADMIN_USERNAME", ""]:
+        abort(403)
+
+    reports = Report.query.order_by(Report.created_at.desc()).all()
+    return render_template("admin_reports.html", reports=reports)
 
 
 if __name__ == '__main__':

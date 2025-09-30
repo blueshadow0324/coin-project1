@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Rapportera ett Mål eller Brott</h2>
+<form method="POST">
+  <div class="mb-3">
+    <label for="category" class="form-label">Type of Case</label>
+    <select name="category" id="category" class="form-select" required>
+      <option value="crime">Brottmål</option>
+      <option value="tvistemal">Tvistemål</option>
+      <option value="statmal">Statsmål</option>
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label for="description" class="form-label">Description</label>
+    <textarea name="description" id="description" rows="4" class="form-control" required></textarea>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Skicka in Mål</button>
+</form>
+
+{% if g.user and (g.user.username == "YOUR_ADMIN_USERNAME" or g.user.username == "ombudsman") %}
+  <a href="{{ url_for('admin_reports') }}" class="btn btn-outline-warning mt-3">
+    📑 Admin Reports
+  </a>
+{% endif %}
+{% endblock %}

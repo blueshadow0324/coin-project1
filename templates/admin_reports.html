@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Alla Reporterade mål</h2>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>User</th>
+      <th>Category</th>
+      <th>Description</th>
+      <th>Date</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in reports %}
+    <tr>
+      <td>{{ r.id }}</td>
+      <td>{{ r.user.username }}</td>
+      <td>
+        {% if r.category == "crime" %} Brottmål
+        {% elif r.category == "tvistemal" %} Tvistemål
+        {% elif r.category == "statmal" %} Statsmål
+        {% else %} {{ r.category }}
+        {% endif %}
+      </td>
+      <td>{{ r.description }}</td>
+      <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
