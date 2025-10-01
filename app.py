@@ -295,7 +295,6 @@ def logout():
 @app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
-    pay_daily_salaries()
     if request.method == 'POST':
         receiver_username = request.form['receiver'].strip()
         amount_str = request.form['amount'].strip()
