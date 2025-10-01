@@ -2477,9 +2477,6 @@ from sqlalchemy import inspect, text
 @app.route("/admin/migrate_salary")
 @login_required
 def migrate_salary():
-    if g.user.username != "YOUR_ADMIN_USERNAME":
-        abort(403)
-
     inspector = inspect(db.engine)
     if "salary" not in inspector.get_table_names():
         with db.engine.begin() as conn:
