@@ -489,6 +489,7 @@ def snake_submit():
     # Save the new score
     new_score = SnakeScore(user_id=g.user.id, score=score, date=today)
     db.session.add(new_score)
+    g.user.coins += score * 3
     db.session.commit()
 
     return jsonify({'message': 'Score saved', 'score': score})
@@ -790,7 +791,7 @@ def flappy_submit():
     db.session.add(new_score)
 
     # Reward 1 coin per score
-    g.user.coins += score
+    g.user.coins += score*3
 
     db.session.commit()
 
