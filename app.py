@@ -2475,47 +2475,15 @@ from datetime import datetime
 
 from sqlalchemy import inspect, text
 
-@app.route("/admin/migrate_salary")
+@app.route("/admin/migrate_all")
 @login_required
-def migrate_salary():
-    inspector = inspect(db.engine)
-    if "salary" not in inspector.get_table_names():
-        with db.engine.begin() as conn:
-            conn.execute(text("""
-                CREATE TABLE salary (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    amount_per_day INTEGER NOT NULL,
-                    active BOOLEAN DEFAULT 1,
-                    last_sent DATETIME,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(user_id) REFERENCES user(id)
-                )
-            """))
-        return "✅ Salary table created!"
-    return "Salary table already exists."
-
-@app.route("/admin/migrate_salary")
-@login_required
-def migrate_salary():
+def migrate_all():
     if g.user.username != "YOUR_ADMIN_USERNAME":
         abort(403)
 
-    inspector = inspect(db.engine)
-    if "salary" not in inspector.get_table_names():
-        with db.engine.begin() as conn:
-            conn.execute(text("""
-                CREATE TABLE salary (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES "user"(id),
-                    amount_per_day INTEGER NOT NULL,
-                    active BOOLEAN DEFAULT TRUE,
-                    last_sent TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-        return "✅ Salary table created!"
-    return "Salary table already exists."
+    db.create_all()   # creates all tables that don’t exist yet
+    return "✅ All tables created (if they didn’t already exist)"
+
 
 
 if __name__ == '__main__':
