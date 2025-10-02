@@ -49,6 +49,7 @@ class Salary(db.Model):
 
 
 class StateBudget(db.Model):
+    __tablename__ = "state_budget"
     id = db.Column(db.Integer, primary_key=True)
     total_amount = db.Column(db.Integer, default=1000)   # current available funds
     updated_at = db.Column(db.DateTime, default=datetime.utcnow)
