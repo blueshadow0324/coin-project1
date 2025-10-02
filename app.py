@@ -2494,6 +2494,25 @@ def migrate_salary():
         return "✅ Salary table created!"
     return "Salary table already exists."
 
+@app.route("/admin/migrate_budget")
+@login_required
+def migrate_budget():
+    if g.user.username != "YOUR_ADMIN_USERNAME":
+        abort(403)
+
+    inspector = inspect(db.engine)
+    if "state_budget" not in inspector.get_table_names():
+        with db.engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE state_budget (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    total_amount INTEGER DEFAULT 1000,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+        return "✅ StateBudget table created!"
+    return "ℹ️ StateBudget table already exists."
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=True)
